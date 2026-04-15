@@ -526,9 +526,9 @@
             <a-entity
                 id="ipilot-model"
                 gltf-model="#iPilotModel"
-                position="-0.10 0.22 0.35"
+                position="-0.051 0.010 0.35"
                 rotation="0 0 0"
-                scale="0.06 0.06 0.06"
+                scale="0.1 0.1 0.1"
                 visible="false"
                 animation="property: rotation;
                            from: 0 0 0; to: 0 360 0;
@@ -631,7 +631,7 @@
                 <a-entity
                     id="video-btn-1"
                     class="clickable"
-                    position="0.12 0.12 0.01"
+                    position="0.143 -0.226 0.01"
                 >
                     <a-plane
                         color="#000000" opacity="0.45"
@@ -654,7 +654,7 @@
                 <a-entity
                     id="video-btn-2"
                     class="clickable"
-                    position="0.36 0.12 0.01"
+                    position="0.342 -0.226 0.01"
                 >
                     <a-plane
                         color="#000000" opacity="0.45"
@@ -673,11 +673,34 @@
                     ></a-text>
                 </a-entity>
 
-                <!-- ─ Button 3: Intraspecific Aggregation (bottom-left image) ─ -->
+                 <!-- ─ Button 3: Snipefish (bottom-left image) ─ -->
                 <a-entity
                     id="video-btn-3"
                     class="clickable"
-                    position="0.12 0.00 0.01"
+                    position="0.143 -0.341 0.01"
+                >
+                    <a-plane
+                        color="#000000" opacity="0.45"
+                        width="0.21" height="0.12"
+                    ></a-plane>
+                    <a-text
+                        value="▶" align="center" color="#FFFFFF"
+                        scale="0.20 0.20 0.20"
+                        position="0 0.015 0.005"
+                    ></a-text>
+                    <a-text
+                        value="Snipefish" align="center" color="#DDDDDD"
+                        scale="0.048 0.048 0.048"
+                        position="0 -0.038 0.005"
+                        wrap-count="18"
+                    ></a-text>
+                </a-entity>
+
+                <!-- ─ Button 4: Intraspecific Aggregation (bottom-right image) ─ -->
+                <a-entity
+                    id="video-btn-4"
+                    class="clickable"
+                    position="0.342 -0.341 0.01"
                 >
                     <a-plane
                         color="#000000" opacity="0.45"
@@ -696,28 +719,6 @@
                     ></a-text>
                 </a-entity>
 
-                <!-- ─ Button 4: Snipefish (bottom-right image) ─ -->
-                <a-entity
-                    id="video-btn-4"
-                    class="clickable"
-                    position="0.36 0.00 0.01"
-                >
-                    <a-plane
-                        color="#000000" opacity="0.45"
-                        width="0.21" height="0.12"
-                    ></a-plane>
-                    <a-text
-                        value="▶" align="center" color="#FFFFFF"
-                        scale="0.20 0.20 0.20"
-                        position="0 0.015 0.005"
-                    ></a-text>
-                    <a-text
-                        value="Snipefish" align="center" color="#DDDDDD"
-                        scale="0.048 0.048 0.048"
-                        position="0 -0.038 0.005"
-                        wrap-count="18"
-                    ></a-text>
-                </a-entity>
 
             </a-entity><!-- end #video-buttons -->
 
@@ -811,7 +812,7 @@
             <a-plane
                 id="azores-hitbox"
                 class="clickable"
-                position="0.34 0.38 0.01"
+                position="0.317 0.107 0.01"
                 width="0.22"
                 height="0.20"
                 color="#FFFFFF"
