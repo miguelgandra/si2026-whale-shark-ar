@@ -39,6 +39,39 @@
         }
 
         // ============================================================
+        //  SCREEN WAKE LOCK
+        //  Keeps the display on while the AR experience is running.
+        //  The lock is automatically released by the browser when the
+        //  page is hidden (e.g. user switches apps); the visibilitychange
+        //  listener re-acquires it when they return.
+        // ============================================================
+        let wakeLock = null;
+
+        async function requestWakeLock() {
+            if (!('wakeLock' in navigator)) {
+                console.log('ℹ️ Wake Lock API not supported on this browser.');
+                return;
+            }
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+                console.log('✅ Wake lock acquired.');
+                wakeLock.addEventListener('release', () => {
+                    console.log('ℹ️ Wake lock released by browser.');
+                });
+            } catch (err) {
+                // Non-fatal: common on low-battery or when permission is denied
+                console.warn('⚠️ Wake lock request failed:', err.name, err.message);
+            }
+        }
+
+        // Re-acquire when user returns to the tab (browser releases the lock on hide)
+        document.addEventListener('visibilitychange', () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                requestWakeLock();
+            }
+        });
+
+        // ============================================================
         //  Unlock HTML5 video elements for mobile browsers.
         //  Called once on the starter-overlay tap to satisfy the
         //  browser's "user gesture required" requirement for video.
@@ -61,6 +94,53 @@
     </script>
 
     <script>
+        // ============================================================
+        //  COMPONENT: orbit-swimmer
+        //
+        //  Moves an entity in a smooth circular orbit (XZ plane) and
+        //  continuously updates its Y-rotation so it always faces the
+        //  tangential direction of travel — no matter where it is in
+        //  the circle.
+        //
+        //  MATHS (verified):
+        //   angle θ = (t_ms / period_ms) × 2π
+        //   x = radius × cos(θ)
+        //   z = −radius × sin(θ)          ← negative → CCW from above
+        //
+        //   Orbit tangent direction = (−sin θ, 0, −cos θ)
+        //   For a −Z-forward model, world Y-rot φ satisfying
+        //     (−sin φ, 0, −cos φ) = tangent
+        //   gives  φ = θ  →  yaw_deg = θ × (180/π)
+        //
+        //  modelYaw adjusts for non-standard model facing directions:
+        //   −Z forward (GLTF standard) → modelYaw: 0    (default)
+        //   +Z forward                 → modelYaw: 180
+        //   +X forward                 → modelYaw: −90
+        //   −X forward                 → modelYaw: 90
+        // ============================================================
+        AFRAME.registerComponent('orbit-swimmer', {
+            schema: {
+                radius:   { type: 'number', default: 0.65 },
+                period:   { type: 'number', default: 20000 }, // ms per full orbit
+                yOffset:  { type: 'number', default: 0 },
+                modelYaw: { type: 'number', default: 0 }      // model facing correction
+            },
+            tick: function (t) {
+                const angle = (t / this.data.period) * Math.PI * 2;
+
+                // Position — uses object3D directly for tick efficiency
+                this.el.object3D.position.set(
+                    Math.cos(angle)  * this.data.radius,
+                    this.data.yOffset,
+                    -Math.sin(angle) * this.data.radius
+                );
+
+                // Y-rotation — tangent facing
+                const yawRad = angle + (this.data.modelYaw * Math.PI / 180);
+                this.el.object3D.rotation.set(0, yawRad, 0);
+            }
+        });
+
         // ============================================================
         //  COMPONENT: clickable
         //  Opens a URL in a new tab when an A-Frame entity is clicked.
@@ -136,6 +216,10 @@
                     this.sideContent.setAttribute('visible', true);
                     this.videoButtons.setAttribute('visible', true);
                     this.azoresHitbox.setAttribute('visible', true);
+                    // Defensively ensure overlay is hidden every time target is found.
+                    // Prevents any MindAR/A-Frame initialisation race that might
+                    // leave the overlay visible and blocking raycasts.
+                    this.panelOverlay.setAttribute('visible', false);
                     // Resume 3D model animations
                     this.whaleShark.setAttribute('animation-mixer', 'timeScale: 1');
                     this.fishParticle.setAttribute('animation-mixer', 'timeScale: 1');
@@ -285,28 +369,29 @@
                 this.el.addEventListener('targetFound', this.onTargetFound);
                 this.el.addEventListener('targetLost',  this.onTargetLost);
 
-                // Video buttons
-                this.el.querySelector('#video-btn-1').addEventListener('click', this.onVideoBtn1);
-                this.el.querySelector('#video-btn-2').addEventListener('click', this.onVideoBtn2);
-                this.el.querySelector('#video-btn-3').addEventListener('click', this.onVideoBtn3);
-                this.el.querySelector('#video-btn-4').addEventListener('click', this.onVideoBtn4);
-                this.el.querySelector('#close-video-btn').addEventListener('click', this.onCloseVideo);
+                // Video buttons — listeners on the <a-plane> elements that
+                // have geometry (class="clickable"), matching the example pattern.
+                this.el.querySelector('#video-btn-1-plane').addEventListener('click', this.onVideoBtn1);
+                this.el.querySelector('#video-btn-2-plane').addEventListener('click', this.onVideoBtn2);
+                this.el.querySelector('#video-btn-3-plane').addEventListener('click', this.onVideoBtn3);
+                this.el.querySelector('#video-btn-4-plane').addEventListener('click', this.onVideoBtn4);
+                this.el.querySelector('#close-video-plane').addEventListener('click', this.onCloseVideo);
 
                 // Azores map
                 this.azoresHitbox.addEventListener('click', this.onAzoresClick);
-                this.el.querySelector('#close-map-btn').addEventListener('click', this.onCloseMap);
+                this.el.querySelector('#close-map-plane').addEventListener('click', this.onCloseMap);
             },
 
             remove: function () {
                 this.el.removeEventListener('targetFound', this.onTargetFound);
                 this.el.removeEventListener('targetLost',  this.onTargetLost);
-                this.el.querySelector('#video-btn-1')?.removeEventListener('click', this.onVideoBtn1);
-                this.el.querySelector('#video-btn-2')?.removeEventListener('click', this.onVideoBtn2);
-                this.el.querySelector('#video-btn-3')?.removeEventListener('click', this.onVideoBtn3);
-                this.el.querySelector('#video-btn-4')?.removeEventListener('click', this.onVideoBtn4);
-                this.el.querySelector('#close-video-btn')?.removeEventListener('click', this.onCloseVideo);
+                this.el.querySelector('#video-btn-1-plane')?.removeEventListener('click', this.onVideoBtn1);
+                this.el.querySelector('#video-btn-2-plane')?.removeEventListener('click', this.onVideoBtn2);
+                this.el.querySelector('#video-btn-3-plane')?.removeEventListener('click', this.onVideoBtn3);
+                this.el.querySelector('#video-btn-4-plane')?.removeEventListener('click', this.onVideoBtn4);
+                this.el.querySelector('#close-video-plane')?.removeEventListener('click', this.onCloseVideo);
                 this.azoresHitbox?.removeEventListener('click', this.onAzoresClick);
-                this.el.querySelector('#close-map-btn')?.removeEventListener('click', this.onCloseMap);
+                this.el.querySelector('#close-map-plane')?.removeEventListener('click', this.onCloseMap);
             }
         });
     </script>
@@ -333,18 +418,31 @@
             cursor: pointer;
             -webkit-tap-highlight-color: transparent;
         }
-        #starter-overlay .shark-icon { font-size: 3.5em; margin-bottom: 8px; }
+        #starter-overlay .conf-logo {
+            width: 130px;
+            margin-bottom: 10px;
+            border-radius: 10px;
+        }
+        #starter-overlay .conf-name {
+            font-size: 0.82em;
+            color: #7ec8e3;
+            margin: 0 0 14px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        #starter-overlay .shark-icon { font-size: 3em; margin-bottom: 6px; }
         #starter-overlay h1 {
-            font-size: 1.6em;
+            font-size: 1.5em;
             font-weight: 700;
-            margin: 0 0 6px;
+            margin: 0 0 4px;
             letter-spacing: 0.02em;
         }
         #starter-overlay .subtitle {
-            font-size: 0.95em;
+            font-size: 0.90em;
             color: #a8cce8;
-            margin: 0 24px 24px;
-            max-width: 360px;
+            margin: 0 24px 22px;
+            max-width: 340px;
             line-height: 1.5;
         }
         #starter-overlay .tap-hint {
@@ -353,7 +451,7 @@
             border: 1px solid #336699;
             padding: 8px 22px;
             border-radius: 20px;
-            margin-top: 8px;
+            margin-top: 6px;
         }
     </style>
 </head>
@@ -364,7 +462,9 @@
     <!--  Satisfies mobile browser "user gesture" requirement and     -->
     <!--  unlocks video elements for later programmatic playback.     -->
     <!-- ============================================================ -->
-    <div id="starter-overlay" onclick="unlockVideos(); this.style.display='none';">
+    <div id="starter-overlay" onclick="unlockVideos(); requestWakeLock(); this.style.display='none';">
+        <img src="media/SI2026-logo.png" class="conf-logo" alt="Sharks International 2026">
+        <p class="conf-name">Sharks International 2026</p>
         <div class="shark-icon">🦈</div>
         <h1>Whale Shark AR</h1>
         <p class="subtitle">
@@ -427,6 +527,7 @@
             <img id="posterImage"   src="SI2026%20-%20poster-web.jpg"  crossorigin="anonymous">
             <img id="profileImage"  src="media/profile.png"        crossorigin="anonymous">
             <img id="azoresMapImg"  src="media/azores-map.png"     crossorigin="anonymous">
+            <img id="linkedInLogo"  src="media/linkedIn-logo.png"  crossorigin="anonymous">
 
         </a-assets>
 
@@ -457,9 +558,11 @@
             <!--  Renders the poster image flat on the detected       -->
             <!--  target for visual anchoring.                        -->
             <!-- ──────────────────────────────────────────────────── -->
+            <!-- shader: flat → renders at full brightness regardless of scene lighting -->
             <a-plane
                 id="static-poster"
                 src="#posterImage"
+                material="shader: flat; src: #posterImage"
                 position="0 0 0"
                 width="1"
                 height="1.41"
@@ -470,46 +573,49 @@
             <!--  WHALE SHARK ORBIT SYSTEM                            -->
             <!--                                                      -->
             <!--  Architecture:                                       -->
-            <!--    orbit-parent  – rotates around Y-axis (the        -->
-            <!--                   "turntable" providing circular     -->
-            <!--                   motion around the poster)          -->
-            <!--    whale-shark   – child, offset along +X so it      -->
-            <!--                   orbits at radius 0.9 units         -->
-            <!--    fish-particle – child, positioned near the shark  -->
+            <!--    orbit-parent   – static position anchor (no       -->
+            <!--                    animation); visibility toggled    -->
+            <!--                    by ar-handler on target events.   -->
+            <!--    whale-shark    – driven by orbit-swimmer tick      -->
+            <!--                    component: computes XZ position   -->
+            <!--                    AND Y-rotation every frame so     -->
+            <!--                    the model always faces the orbit  -->
+            <!--                    tangent direction of travel.      -->
+            <!--    fish-particle  – child of whale-shark; follows    -->
+            <!--                    automatically at a fixed local    -->
+            <!--                    offset behind the shark.          -->
             <!--                                                      -->
-            <!--  The Y-axis rotation naturally keeps the shark       -->
-            <!--  facing the direction of travel throughout the orbit.-->
-            <!--  Adjust `dur` to change orbit speed (ms per loop).  -->
+            <!--  orbit-swimmer schema:                               -->
+            <!--    radius   – orbit circle radius (0.65 units)       -->
+            <!--    period   – ms per full circle (20 000 ms)         -->
+            <!--    modelYaw – facing correction (see component docs)  -->
+            <!--      0   → −Z forward (GLTF standard) ← default     -->
+            <!--      180 → +Z forward                               -->
+            <!--     −90 → +X forward                               -->
+            <!--      90 → −X forward                               -->
             <!-- ──────────────────────────────────────────────────── -->
             <a-entity
                 id="orbit-parent"
                 position="0 0.05 0.20"
                 visible="false"
-                animation="property: rotation;
-                           from: 0 0 0; to: 0 360 0;
-                           dur: 20000; easing: linear; loop: true"
             >
-                <!-- Whale Shark -->
-                <!-- rotation="0 90 0" orients the model to face the    -->
-                <!-- orbit tangent; adjust Y if shark faces wrong way.  -->
+                <!-- Whale Shark — orbit-swimmer drives position + yaw -->
                 <a-entity
                     id="whale-shark"
                     gltf-model="#whaleSharkModel"
-                    position="0.9 0 0"
-                    rotation="0 90 0"
+                    orbit-swimmer="radius: 0.65; period: 20000; modelYaw: 0"
                     scale="0.12 0.12 0.12"
                     animation-mixer="clip: *; loop: repeat; timeScale: 0"
-                ></a-entity>
-
-                <!-- Fish Particle School (near the shark) -->
-                <a-entity
-                    id="fish-particle"
-                    gltf-model="#fishParticleModel"
-                    position="0.70 0.06 0.14"
-                    rotation="0 90 0"
-                    scale="0.20 0.20 0.20"
-                    animation-mixer="clip: *; loop: repeat; timeScale: 0"
-                ></a-entity>
+                >
+                    <!-- Fish Particle School — trails the shark as a child -->
+                    <a-entity
+                        id="fish-particle"
+                        gltf-model="#fishParticleModel"
+                        position="-0.5 0.1 0.1"
+                        scale="1.6 1.6 1.6"
+                        animation-mixer="clip: *; loop: repeat; timeScale: 0"
+                    ></a-entity>
+                </a-entity>
             </a-entity>
 
             <!-- ──────────────────────────────────────────────────── -->
@@ -598,12 +704,19 @@
                                    dir: alternate; easing: easeInOutSine; loop: true;
                                    delay: 200"
                     ></a-plane>
+                    <!-- LinkedIn logo icon (left side) -->
+                    <a-image
+                        src="#linkedInLogo"
+                        width="0.048" height="0.048"
+                        position="-0.14 0 0.012"
+                    ></a-image>
+                    <!-- Handle text -->
                     <a-text
-                        value="in  LinkedIn Profile"
-                        align="center" color="#FFF"
-                        scale="0.073 0.073 0.073"
-                        position="0 0 0.01"
-                        wrap-count="22"
+                        value="miguel-gandra"
+                        align="left" color="#FFF"
+                        scale="0.075 0.075 0.075"
+                        position="-0.10 0 0.012"
+                        wrap-count="16"
                     ></a-text>
                 </a-entity>
             </a-entity>
@@ -628,12 +741,10 @@
             <a-entity id="video-buttons" visible="false">
 
                 <!-- ─ Button 1: Lunge Feeding (top-left image) ─ -->
-                <a-entity
-                    id="video-btn-1"
-                    class="clickable"
-                    position="0.143 -0.226 0.01"
-                >
+                <a-entity position="0.143 -0.226 0.01">
                     <a-plane
+                        id="video-btn-1-plane"
+                        class="clickable"
                         color="#000000" opacity="0.45"
                         width="0.21" height="0.12"
                     ></a-plane>
@@ -651,12 +762,10 @@
                 </a-entity>
 
                 <!-- ─ Button 2: Stationary Feeding (top-right image) ─ -->
-                <a-entity
-                    id="video-btn-2"
-                    class="clickable"
-                    position="0.342 -0.226 0.01"
-                >
+                <a-entity position="0.342 -0.226 0.01">
                     <a-plane
+                        id="video-btn-2-plane"
+                        class="clickable"
                         color="#000000" opacity="0.45"
                         width="0.21" height="0.12"
                     ></a-plane>
@@ -673,13 +782,11 @@
                     ></a-text>
                 </a-entity>
 
-                 <!-- ─ Button 3: Snipefish (bottom-left image) ─ -->
-                <a-entity
-                    id="video-btn-3"
-                    class="clickable"
-                    position="0.143 -0.341 0.01"
-                >
+                <!-- ─ Button 3: Snipefish (bottom-left image) ─ -->
+                <a-entity position="0.143 -0.341 0.01">
                     <a-plane
+                        id="video-btn-3-plane"
+                        class="clickable"
                         color="#000000" opacity="0.45"
                         width="0.21" height="0.12"
                     ></a-plane>
@@ -697,12 +804,10 @@
                 </a-entity>
 
                 <!-- ─ Button 4: Intraspecific Aggregation (bottom-right image) ─ -->
-                <a-entity
-                    id="video-btn-4"
-                    class="clickable"
-                    position="0.342 -0.341 0.01"
-                >
+                <a-entity position="0.342 -0.341 0.01">
                     <a-plane
+                        id="video-btn-4-plane"
+                        class="clickable"
                         color="#000000" opacity="0.45"
                         width="0.21" height="0.12"
                     ></a-plane>
@@ -784,8 +889,10 @@
                 ></a-text>
 
                 <!-- Close button (top-right corner of popup) -->
-                <a-entity id="close-video-btn" class="clickable" position="0.38 0.263 0.01">
+                <a-entity position="0.38 0.263 0.01">
                     <a-plane
+                        id="close-video-plane"
+                        class="clickable"
                         color="#CC2222" opacity="0.90"
                         width="0.065" height="0.065"
                         animation="property: material.opacity;
@@ -865,8 +972,10 @@
                 ></a-text>
 
                 <!-- Close button -->
-                <a-entity id="close-map-btn" class="clickable" position="0.41 0.363 0.01">
+                <a-entity position="0.41 0.363 0.01">
                     <a-plane
+                        id="close-map-plane"
+                        class="clickable"
                         color="#CC2222" opacity="0.90"
                         width="0.065" height="0.065"
                         animation="property: material.opacity;
