@@ -72,6 +72,25 @@
         });
 
         // ============================================================
+        //  START AR
+        //  Called on the starter-overlay tap AFTER the scene has been
+        //  allowed to load silently (autoStart: false on mindar-image).
+        //  This defers MindAR's WebGL pipeline init until the user
+        //  taps, so the camera permission prompt appears immediately
+        //  instead of after a multi-second hang.
+        // ============================================================
+        function startAR() {
+            const scene = document.querySelector('a-scene');
+            if (scene.hasLoaded) {
+                scene.components['mindar-image-system'].start();
+            } else {
+                scene.addEventListener('loaded', () => {
+                    scene.components['mindar-image-system'].start();
+                }, { once: true });
+            }
+        }
+
+        // ============================================================
         //  Unlock HTML5 video elements for mobile browsers.
         //  Called once on the starter-overlay tap to satisfy the
         //  browser's "user gesture required" requirement for video.
@@ -105,12 +124,12 @@
         //  MATHS (verified):
         //   angle θ = (t_ms / period_ms) × 2π
         //   x = radius × cos(θ)
-        //   z = −radius × sin(θ)          ← negative → CCW from above
+        //   z = +radius × sin(θ)          ← positive → CW from above (nose leads)
         //
-        //   Orbit tangent direction = (−sin θ, 0, −cos θ)
+        //   CW orbit tangent direction = (+sin θ, 0, −cos θ)
         //   For a −Z-forward model, world Y-rot φ satisfying
         //     (−sin φ, 0, −cos φ) = tangent
-        //   gives  φ = θ  →  yaw_deg = θ × (180/π)
+        //   gives  φ = θ + π  →  yaw_deg = θ × (180/π) + 180
         //
         //  modelYaw adjusts for non-standard model facing directions:
         //   −Z forward (GLTF standard) → modelYaw: 0    (default)
@@ -128,15 +147,15 @@
             tick: function (t) {
                 const angle = (t / this.data.period) * Math.PI * 2;
 
-                // Position — uses object3D directly for tick efficiency
+                // Position — CW orbit; uses object3D directly for tick efficiency
                 this.el.object3D.position.set(
                     Math.cos(angle)  * this.data.radius,
                     this.data.yOffset,
-                    -Math.sin(angle) * this.data.radius
+                    Math.sin(angle)  * this.data.radius   // positive = CW from above
                 );
 
-                // Y-rotation — tangent facing
-                const yawRad = angle + (this.data.modelYaw * Math.PI / 180);
+                // Y-rotation — add π so nose (not tail) leads the CW tangent
+                const yawRad = angle + Math.PI + (this.data.modelYaw * Math.PI / 180);
                 this.el.object3D.rotation.set(0, yawRad, 0);
             }
         });
@@ -212,6 +231,7 @@
                 this.showContent = () => {
                     this.poster.setAttribute('visible', true);
                     this.orbitParent.setAttribute('visible', true);
+                    this.fishParticle.setAttribute('visible', true);
                     this.iPilot.setAttribute('visible', true);
                     this.sideContent.setAttribute('visible', true);
                     this.videoButtons.setAttribute('visible', true);
@@ -229,6 +249,7 @@
                 this.hideContent = () => {
                     this.poster.setAttribute('visible', false);
                     this.orbitParent.setAttribute('visible', false);
+                    this.fishParticle.setAttribute('visible', false);
                     this.iPilot.setAttribute('visible', false);
                     this.sideContent.setAttribute('visible', false);
                     this.videoButtons.setAttribute('visible', false);
@@ -239,6 +260,43 @@
                     // Close any open popup
                     this.closeAll();
                     console.log('⏸ Content hidden.');
+                };
+
+                // ════════════════════════════════════════════════════
+                //  MODEL PAUSE / RESUME
+                //  Called when a popup opens/closes to freeze all 3D
+                //  activity behind the overlay and restore it after.
+                // ════════════════════════════════════════════════════
+                this.pauseModels = () => {
+                    // Stop orbit-swimmer tick (freezes position + yaw updates)
+                    if (this.whaleShark.components['orbit-swimmer']) {
+                        this.whaleShark.components['orbit-swimmer'].pause();
+                    }
+                    // Freeze GLTF swimming animations
+                    this.whaleShark.setAttribute('animation-mixer', 'timeScale: 0');
+                    this.fishParticle.setAttribute('animation-mixer', 'timeScale: 0');
+                    // Pause iPilot Y-rotation animation
+                    if (this.iPilot.components && this.iPilot.components.animation) {
+                        this.iPilot.components.animation.pause();
+                    }
+                    console.log('⏸ Models paused.');
+                };
+
+                this.resumeModels = () => {
+                    // Only resume if the poster is still in frame
+                    if (!this.targetVisible) return;
+                    // Restart orbit-swimmer tick
+                    if (this.whaleShark.components['orbit-swimmer']) {
+                        this.whaleShark.components['orbit-swimmer'].play();
+                    }
+                    // Resume GLTF swimming animations
+                    this.whaleShark.setAttribute('animation-mixer', 'timeScale: 1');
+                    this.fishParticle.setAttribute('animation-mixer', 'timeScale: 1');
+                    // Resume iPilot Y-rotation animation
+                    if (this.iPilot.components && this.iPilot.components.animation) {
+                        this.iPilot.components.animation.play();
+                    }
+                    console.log('▶ Models resumed.');
                 };
 
                 // ════════════════════════════════════════════════════
@@ -258,6 +316,8 @@
                     this.videoScreen.setAttribute('material', 'shader', 'flat');
                     // Update title label
                     if (this.videoTitle) this.videoTitle.setAttribute('value', label);
+                    // Pause 3D models while popup is open
+                    this.pauseModels();
                     // Show popup + overlay
                     this.videoPopup.setAttribute('visible', true);
                     this.panelOverlay.setAttribute('visible', true);
@@ -277,6 +337,8 @@
                     }
                     this.videoPopup.setAttribute('visible', false);
                     this.panelOverlay.setAttribute('visible', false);
+                    // Resume 3D models now that popup is closed
+                    this.resumeModels();
                     console.log('⏹ Video closed.');
                 };
 
@@ -291,6 +353,8 @@
                         this.activeVideoEl = null;
                         this.videoPopup.setAttribute('visible', false);
                     }
+                    // Pause 3D models while popup is open
+                    this.pauseModels();
                     this.azoresPopup.setAttribute('visible', true);
                     this.panelOverlay.setAttribute('visible', true);
                     console.log('🗺 Azores map opened.');
@@ -299,6 +363,8 @@
                 this.closeMap = () => {
                     this.azoresPopup.setAttribute('visible', false);
                     this.panelOverlay.setAttribute('visible', false);
+                    // Resume 3D models now that popup is closed
+                    this.resumeModels();
                     console.log('🗺 Azores map closed.');
                 };
 
@@ -314,6 +380,8 @@
                     this.videoPopup.setAttribute('visible', false);
                     this.azoresPopup.setAttribute('visible', false);
                     this.panelOverlay.setAttribute('visible', false);
+                    // Resume models (guard inside resumeModels checks targetVisible)
+                    this.resumeModels();
                 };
 
                 // ════════════════════════════════════════════════════
@@ -462,7 +530,7 @@
     <!--  Satisfies mobile browser "user gesture" requirement and     -->
     <!--  unlocks video elements for later programmatic playback.     -->
     <!-- ============================================================ -->
-    <div id="starter-overlay" onclick="unlockVideos(); requestWakeLock(); this.style.display='none';">
+    <div id="starter-overlay" onclick="unlockVideos(); requestWakeLock(); startAR(); this.style.display='none';">
         <img src="media/SI2026-logo.png" class="conf-logo" alt="Sharks International 2026">
         <p class="conf-name">Sharks International 2026</p>
         <div class="shark-icon">🦈</div>
@@ -480,6 +548,7 @@
     <!-- ============================================================ -->
     <a-scene
         mindar-image="imageTargetSrc: targets.mind;
+                      autoStart: false;
                       filterMinCF: 0.0001;
                       filterBeta: 0.1;
                       missTolerance: 5;
@@ -500,22 +569,22 @@
                  it works on your target devices) -->
             <video id="videoLungeFeeding"
                 src="media/lunge-feeding.mp4"
-                preload="auto" loop muted playsinline webkit-playsinline
+                preload="metadata" loop muted playsinline webkit-playsinline
                 crossorigin="anonymous"></video>
 
             <video id="videoStationaryFeeding"
                 src="media/stationary-feeding.mp4"
-                preload="auto" loop muted playsinline webkit-playsinline
+                preload="metadata" loop muted playsinline webkit-playsinline
                 crossorigin="anonymous"></video>
 
             <video id="videoIntraspecific"
                 src="media/intraspecific-aggregation.mp4"
-                preload="auto" loop muted playsinline webkit-playsinline
+                preload="metadata" loop muted playsinline webkit-playsinline
                 crossorigin="anonymous"></video>
 
             <video id="videoSnipefish"
                 src="media/snipefish.mp4"
-                preload="auto" loop muted playsinline webkit-playsinline
+                preload="metadata" loop muted playsinline webkit-playsinline
                 crossorigin="anonymous"></video>
 
             <!-- 3D Models -->
@@ -581,9 +650,8 @@
             <!--                    AND Y-rotation every frame so     -->
             <!--                    the model always faces the orbit  -->
             <!--                    tangent direction of travel.      -->
-            <!--    fish-particle  – child of whale-shark; follows    -->
-            <!--                    automatically at a fixed local    -->
-            <!--                    offset behind the shark.          -->
+            <!--    fish-particle  – independent entity at fixed poster  -->
+            <!--                    position; toggled by ar-handler.  -->
             <!--                                                      -->
             <!--  orbit-swimmer schema:                               -->
             <!--    radius   – orbit circle radius (0.65 units)       -->
@@ -606,17 +674,23 @@
                     orbit-swimmer="radius: 0.65; period: 20000; modelYaw: 0"
                     scale="0.12 0.12 0.12"
                     animation-mixer="clip: *; loop: repeat; timeScale: 0"
-                >
-                    <!-- Fish Particle School — trails the shark as a child -->
-                    <a-entity
-                        id="fish-particle"
-                        gltf-model="#fishParticleModel"
-                        position="-0.5 0.1 0.1"
-                        scale="1.6 1.6 1.6"
-                        animation-mixer="clip: *; loop: repeat; timeScale: 0"
-                    ></a-entity>
-                </a-entity>
+                ></a-entity>
             </a-entity>
+
+            <!-- ──────────────────────────────────────────────────── -->
+            <!--  FISH PARTICLE SCHOOL                                -->
+            <!--  Independent fixed position (not a child of the      -->
+            <!--  shark). Matches layout from the example boilerplate. -->
+            <!--  Visibility is toggled by ar-handler on target events.-->
+            <!-- ──────────────────────────────────────────────────── -->
+            <a-entity
+                id="fish-particle"
+                gltf-model="#fishParticleModel"
+                position="-0.33 0.35 0.05"
+                scale="0.3 0.3 0.3"
+                visible="false"
+                animation-mixer="clip: *; loop: repeat; timeScale: 0"
+            ></a-entity>
 
             <!-- ──────────────────────────────────────────────────── -->
             <!--  iPILOT BIOLOGGING TAG MODEL                         -->
