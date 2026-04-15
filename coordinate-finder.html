@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR Coordinate Finder – SI2026 Poster</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #1a1a2e;
+            color: #e0e0f0;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        h1 {
+            font-size: 1.3em;
+            font-weight: 600;
+            margin: 0 0 4px;
+            color: #7ec8e3;
+        }
+        .subtitle {
+            font-size: 0.85em;
+            color: #7788aa;
+            margin: 0 0 18px;
+        }
+
+        .layout {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        /* ── Poster container ─────────────────────────── */
+        .poster-wrap {
+            position: relative;
+            border: 2px solid #334466;
+            border-radius: 6px;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        #poster {
+            display: block;
+            max-width: 70vw;
+            max-height: 82vh;
+            cursor: crosshair;
+        }
+        /* Crosshair marker rendered on click */
+        #crosshair {
+            position: absolute;
+            pointer-events: none;
+            display: none;
+        }
+        #crosshair::before, #crosshair::after {
+            content: '';
+            position: absolute;
+            background: #ff4444;
+        }
+        #crosshair::before { width: 1px; height: 18px; top: -9px; left: 0; }
+        #crosshair::after  { width: 18px; height: 1px; left: -9px; top: 0; }
+
+        /* ── Output panel ─────────────────────────────── */
+        .output-panel {
+            flex: 1;
+            min-width: 280px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .result-card {
+            background: #0d1b2a;
+            border: 1px solid #2a4060;
+            border-radius: 8px;
+            padding: 14px 16px;
+        }
+        .result-card h3 {
+            font-size: 0.78em;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #556688;
+            margin: 0 0 8px;
+        }
+        .result-card .value {
+            font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+            font-size: 1.05em;
+            color: #f08080;
+            word-break: break-all;
+        }
+        .result-card .value.placeholder {
+            color: #445566;
+            font-style: italic;
+        }
+
+        .copy-btn {
+            margin-top: 8px;
+            background: #1e3a5f;
+            color: #a0c8e8;
+            border: 1px solid #2a5080;
+            border-radius: 5px;
+            padding: 5px 12px;
+            font-size: 0.8em;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .copy-btn:hover { background: #264870; }
+        .copy-btn.copied { background: #1e5f3a; color: #80e8a0; border-color: #2a8050; }
+
+        /* ── History log ──────────────────────────────── */
+        .history-wrap { }
+        .history-wrap h3 {
+            font-size: 0.78em;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #556688;
+            margin: 0 0 6px;
+        }
+        #history-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+        #history-list li {
+            font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+            font-size: 0.8em;
+            color: #8899bb;
+            padding: 3px 0;
+            border-bottom: 1px solid #1a2a3a;
+            cursor: pointer;
+        }
+        #history-list li:hover { color: #f08080; }
+        #history-list li span.label {
+            color: #556688;
+            margin-right: 6px;
+        }
+
+        .tip {
+            background: #0a2030;
+            border-left: 3px solid #336699;
+            padding: 10px 14px;
+            border-radius: 0 6px 6px 0;
+            font-size: 0.82em;
+            color: #8899bb;
+            line-height: 1.6;
+        }
+        .tip strong { color: #7ec8e3; }
+
+        /* ── Section selector ─────────────────────────── */
+        .section-btns {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .section-btn {
+            background: #112233;
+            border: 1px solid #334466;
+            color: #7799bb;
+            border-radius: 5px;
+            padding: 5px 11px;
+            font-size: 0.78em;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .section-btn:hover, .section-btn.active {
+            background: #1e3a5f;
+            border-color: #4477aa;
+            color: #aad4f5;
+        }
+    </style>
+</head>
+<body>
+
+<h1>AR Coordinate Finder</h1>
+<p class="subtitle">Click anywhere on the poster → copy the A-Frame position string → paste into <code>index.html</code></p>
+
+<div class="layout">
+
+    <!-- ── Poster image ──────────────────────────────── -->
+    <div class="poster-wrap">
+        <img id="poster" src="SI2026%20-%20poster.png" alt="SI2026 Poster">
+        <div id="crosshair"></div>
+    </div>
+
+    <!-- ── Output panel ──────────────────────────────── -->
+    <div class="output-panel">
+
+        <div class="tip">
+            <strong>How to use:</strong><br>
+            1. Click on any element in the poster image (e.g. centre of a video frame, map figure, iPilot tag image).<br>
+            2. Copy the <code>position</code> string shown below.<br>
+            3. Paste it into the matching element in <code>index.html</code>.
+        </div>
+
+        <!-- Quick-jump section labels -->
+        <div>
+            <div class="history-wrap" style="margin-bottom:6px;">
+                <h3>Jump to section</h3>
+            </div>
+            <div class="section-btns">
+                <button class="section-btn" onclick="highlightHint('azores')">Azores Map</button>
+                <button class="section-btn" onclick="highlightHint('btn1')">Video Btn 1 (TL)</button>
+                <button class="section-btn" onclick="highlightHint('btn2')">Video Btn 2 (TR)</button>
+                <button class="section-btn" onclick="highlightHint('btn3')">Video Btn 3 (BL)</button>
+                <button class="section-btn" onclick="highlightHint('btn4')">Video Btn 4 (BR)</button>
+                <button class="section-btn" onclick="highlightHint('ipilot')">iPilot Tag</button>
+            </div>
+        </div>
+
+        <!-- Last click result -->
+        <div class="result-card">
+            <h3>Last Click → A-Frame position</h3>
+            <div class="value placeholder" id="pos-value">Click on the poster…</div>
+            <button class="copy-btn" id="copy-pos-btn" onclick="copyToClipboard('pos-value', this)" style="display:none">Copy position=""</button>
+        </div>
+
+        <!-- Full attribute string -->
+        <div class="result-card">
+            <h3>Full attribute (ready to paste)</h3>
+            <div class="value placeholder" id="attr-value">Click on the poster…</div>
+            <button class="copy-btn" id="copy-attr-btn" onclick="copyToClipboard('attr-value', this)" style="display:none">Copy full attribute</button>
+        </div>
+
+        <!-- Click history -->
+        <div class="result-card">
+            <div class="history-wrap">
+                <h3>Click history (click to re-copy)</h3>
+                <ul id="history-list"><li><span style="color:#334455;font-style:italic">No clicks yet</span></li></ul>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // ════════════════════════════════════════════════════════════════
+    //  CONSTANTS – must match the <a-plane> dimensions in index.html
+    // ════════════════════════════════════════════════════════════════
+    const A_FRAME_WIDTH  = 1.0;
+    const A_FRAME_HEIGHT = 1.41;
+    const DEFAULT_Z      = 0.01;   // use 0.01 for hitboxes/buttons, 0.35+ for 3D models
+
+    const posterImg  = document.getElementById('poster');
+    const crosshair  = document.getElementById('crosshair');
+    const posValue   = document.getElementById('pos-value');
+    const attrValue  = document.getElementById('attr-value');
+    const historyList= document.getElementById('history-list');
+    const copyPosBtn = document.getElementById('copy-pos-btn');
+    const copyAttrBtn= document.getElementById('copy-attr-btn');
+
+    let history = [];
+
+    // ── Coordinate conversion ─────────────────────────────────────
+    function toAFrame(clickX, clickY, imgW, imgH) {
+        const pctX = clickX / imgW;
+        const pctY = clickY / imgH;
+        // A-Frame: origin at centre, Y flipped
+        const ax = ((pctX - 0.5) * A_FRAME_WIDTH).toFixed(3);
+        const ay = (-(pctY - 0.5) * A_FRAME_HEIGHT).toFixed(3);
+        return { ax, ay };
+    }
+
+    // ── Click handler ─────────────────────────────────────────────
+    posterImg.addEventListener('click', function (e) {
+        const rect   = posterImg.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const clickY = e.clientY - rect.top;
+        const imgW   = posterImg.clientWidth;
+        const imgH   = posterImg.clientHeight;
+
+        const { ax, ay } = toAFrame(clickX, clickY, imgW, imgH);
+        const posStr  = `${ax} ${ay} ${DEFAULT_Z}`;
+        const attrStr = `position="${posStr}"`;
+
+        // Update crosshair position
+        crosshair.style.left   = `${clickX}px`;
+        crosshair.style.top    = `${clickY}px`;
+        crosshair.style.display= 'block';
+
+        // Update result cards
+        posValue.textContent  = posStr;
+        attrValue.textContent = attrStr;
+        posValue.classList.remove('placeholder');
+        attrValue.classList.remove('placeholder');
+        copyPosBtn.style.display = 'inline-block';
+        copyAttrBtn.style.display= 'inline-block';
+        copyPosBtn.textContent   = 'Copy position=""';
+        copyAttrBtn.textContent  = 'Copy full attribute';
+        copyPosBtn.classList.remove('copied');
+        copyAttrBtn.classList.remove('copied');
+
+        // History
+        const label = prompt('Optional: name this click (e.g. "Azores Map centre") or press Enter to skip.', '');
+        addHistory(posStr, label || `Click ${history.length + 1}`);
+    });
+
+    // ── History log ───────────────────────────────────────────────
+    function addHistory(posStr, label) {
+        history.unshift({ posStr, label });
+        if (history.length === 1) historyList.innerHTML = '';
+        const li = document.createElement('li');
+        li.innerHTML = `<span class="label">${escHtml(label)}:</span>${escHtml(posStr)}`;
+        li.title = 'Click to copy';
+        li.onclick = () => {
+            navigator.clipboard.writeText(`position="${posStr}"`).catch(() => {});
+            li.style.color = '#80e8a0';
+            setTimeout(() => li.style.color = '', 1200);
+        };
+        historyList.prepend(li);
+    }
+
+    // ── Clipboard copy ────────────────────────────────────────────
+    function copyToClipboard(elemId, btn) {
+        const text = document.getElementById(elemId).textContent;
+        const toCopy = elemId === 'pos-value' ? `position="${text}"` : text;
+        navigator.clipboard.writeText(toCopy).then(() => {
+            btn.textContent = '✅ Copied!';
+            btn.classList.add('copied');
+            setTimeout(() => {
+                btn.textContent = elemId === 'pos-value' ? 'Copy position=""' : 'Copy full attribute';
+                btn.classList.remove('copied');
+            }, 1800);
+        }).catch(() => {
+            // Fallback for older browsers
+            const el = document.createElement('textarea');
+            el.value = toCopy;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            btn.textContent = '✅ Copied!';
+        });
+    }
+
+    // ── Section highlight hints ───────────────────────────────────
+    // Shows a brief text hint for where to click for each element.
+    const hints = {
+        azores: 'Click the centre of the AZORES MAP FIGURE (above Foraging Ecology section)',
+        btn1:   'Click the centre of the TOP-LEFT behaviour image (Lunge Feeding)',
+        btn2:   'Click the centre of the TOP-RIGHT behaviour image (Stationary Feeding)',
+        btn3:   'Click the centre of the BOTTOM-LEFT behaviour image (Intraspecific Agg.)',
+        btn4:   'Click the centre of the BOTTOM-RIGHT behaviour image (Snipefish)',
+        ipilot: 'Click the centre of the iPILOT TAG IMAGE in the Multi-sensor Biologging box',
+    };
+    function highlightHint(key) {
+        document.querySelectorAll('.section-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        attrValue.textContent = hints[key];
+        attrValue.classList.add('placeholder');
+        posValue.textContent = '← Click that location on the poster image';
+        posValue.classList.add('placeholder');
+    }
+
+    function escHtml(str) {
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+</script>
+</body>
+</html>

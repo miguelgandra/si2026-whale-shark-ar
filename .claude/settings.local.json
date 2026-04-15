@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l /Users/Mig/Desktop/ClaudeCode/\"Whale Shark AR Poster\"/example/poster-ar/legacy/*.html)",
+      "Bash(wc -l /Users/Mig/Desktop/ClaudeCode/\"Whale Shark AR Poster\"/example/poster-ar/*.html)",
+      "Bash(xargs ls:*)",
+      "Bash(awk '{print $5, $9}')"
+    ]
+  }
+}

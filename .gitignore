@@ -1,0 +1,18 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# PDF – not needed for the AR web experience (45 MB, keep out of git)
+*.pdf
+
+# USDZ – Apple AR Quick Look format, not used by this project
+*.usdz
+
+# Example / dev files you may not want to ship to GitHub Pages
+example/
+
+# Node (in case you add a build step later)
+node_modules/
+.env
