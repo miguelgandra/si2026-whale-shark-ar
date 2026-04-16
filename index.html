@@ -120,22 +120,19 @@
         //
         //   For a −Z-forward GLTF model, world forward direction at Y-rot φ:
         //     (−sin φ, 0, −cos φ)
-        //   Setting equal to tangent:
-        //     −sin φ = −sin θ  →  sin φ = sin θ
-        //     −cos φ = −cos θ  →  cos φ = cos θ
-        //   Solution: φ = θ
+        //   Setting equal to tangent → φ = θ
         //
-        //   Verification at key angles:
-        //     θ=0   → yaw=0   → forward=(0,0,−1)  ✓ moving in −Z
-        //     θ=π/2 → yaw=π/2 → forward=(−1,0,0)  ✓ moving in −X
-        //     θ=π   → yaw=π   → forward=(0,0,1)   ✓ moving in +Z
-        //     θ=3π/2→ yaw=3π/2→ forward=(1,0,0)   ✓ moving in +X
+        //   The whale shark model faces +Z (tail forward in GLTF space), so an
+        //   additional π is applied to flip it nose-first:
+        //     yawRad = θ + π
         //
-        //  modelYaw adjusts for non-standard model facing directions:
-        //   −Z forward (GLTF standard) → modelYaw: 0    (default)
-        //   +Z forward                 → modelYaw: 180
-        //   +X forward                 → modelYaw: −90
-        //   −X forward                 → modelYaw: 90
+        //   Verification at key angles (with π flip):
+        //     θ=0   → yaw=π   → forward=(0,0,1)   ✓ moving in −Z (nose leads)
+        //     θ=π/2 → yaw=3π/2→ forward=(1,0,0)   ✓ moving in −X (nose leads)
+        //     θ=π   → yaw=2π  → forward=(0,0,−1)  ✓ moving in +Z (nose leads)
+        //
+        //  modelYaw fine-tunes any remaining facing offset in degrees:
+        //   0 = no additional correction (default)
         // ============================================================
         AFRAME.registerComponent('orbit-swimmer', {
             schema: {
@@ -154,8 +151,8 @@
                     -Math.sin(angle) * this.data.radius   // negative = CCW from above
                 );
 
-                // Y-rotation: φ = θ  (nose leads on CCW orbit, clean formula)
-                const yawRad = angle + (this.data.modelYaw * Math.PI / 180);
+                // Y-rotation: φ = θ + π  (π corrects for model facing +Z instead of −Z)
+                const yawRad = angle + Math.PI + (this.data.modelYaw * Math.PI / 180);
                 this.el.object3D.rotation.set(0, yawRad, 0);
             }
         });
@@ -486,7 +483,12 @@
             text-transform: uppercase;
             font-weight: 600;
         }
-        #starter-overlay .shark-icon { font-size: 3em; margin-bottom: 6px; }
+        #starter-overlay .whale-shark-img {
+            width: 220px;
+            max-width: 80vw;
+            margin-bottom: 12px;
+            display: block;
+        }
         #starter-overlay h1 {
             font-size: 1.5em;
             font-weight: 700;
@@ -536,15 +538,18 @@
             bottom: 56px;
             left: 0;
             right: 0;
-            background: rgba(245, 245, 245, 0.93);
-            color: #222;
+            background: rgba(10, 10, 10, 0.55);
+            color: #d8d8d8;
             padding: 12px 20px 10px;
             font-size: 0.76em;
+            font-weight: 300;
             line-height: 1.75;
             z-index: 500;
             display: none;
-            border-top: 1px solid rgba(0, 0, 0, 0.10);
+            border-top: 1px solid rgba(255, 255, 255, 0.10);
             cursor: pointer;
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
         }
         #info-overlay p {
             margin: 0;
@@ -561,7 +566,7 @@
     <div id="starter-overlay" onclick="unlockVideos(); requestWakeLock(); document.getElementById('info-btn').style.display='flex'; this.style.display='none';">
         <img src="media/SI2026-logo.png" class="conf-logo" alt="Sharks International 2026">
         <p class="conf-name">Sharks International 2026</p>
-        <div class="shark-icon">🦈</div>
+        <img src="media/whale-shark.png" class="whale-shark-img" alt="Whale Shark">
         <h1>Whale Shark AR</h1>
         <p class="subtitle">
             Point your camera at the<br>
@@ -579,9 +584,9 @@
     <div id="info-btn" onclick="toggleInfoOverlay()">ⓘ</div>
 
     <div id="info-overlay" onclick="toggleInfoOverlay()">
-        <p>Built with <strong>MindAR.js</strong> and <strong>A-Frame</strong>.</p>
-        <p>Whale Shark model by <strong>DigitalLife3D</strong> (CC BY-NC 4.0).</p>
-        <p>Fish Particle model by <strong>Loïc Norgeot</strong> (CC BY 4.0).</p>
+        <p>Built with MindAR.js and A-Frame.</p>
+        <p>Whale Shark model by DigitalLife3D (CC BY-NC 4.0).</p>
+        <p>Fish Particle model by Loïc Norgeot (CC BY 4.0).</p>
         <p>iPilot Tag model by the author.</p>
     </div>
 
@@ -788,17 +793,17 @@
                     wrap-count="18"
                 ></a-text>
 
-                <!-- Email Button — icon only -->
+                <!-- Email Button — circular icon -->
                 <a-entity position="0 0.02 0.005">
-                    <a-plane
+                    <a-circle
                         class="clickable"
                         clickable="url: mailto:m3gandra@gmail.com"
                         color="#005f8e"
-                        width="0.10" height="0.10"
+                        radius="0.055"
                         animation="property: material.opacity;
                                    from: 0.65; to: 1.0; dur: 750;
                                    dir: alternate; easing: easeInOutSine; loop: true"
-                    ></a-plane>
+                    ></a-circle>
                     <a-image
                         src="#emailIcon"
                         width="0.068" height="0.068"
@@ -806,18 +811,18 @@
                     ></a-image>
                 </a-entity>
 
-                <!-- LinkedIn Button — icon only -->
+                <!-- LinkedIn Button — circular icon -->
                 <a-entity position="0 -0.11 0.005">
-                    <a-plane
+                    <a-circle
                         class="clickable"
                         clickable="url: https://www.linkedin.com/in/miguel-gandra/"
                         color="#0077B5"
-                        width="0.10" height="0.10"
+                        radius="0.055"
                         animation="property: material.opacity;
                                    from: 0.65; to: 1.0; dur: 750;
                                    dir: alternate; easing: easeInOutSine; loop: true;
                                    delay: 200"
-                    ></a-plane>
+                    ></a-circle>
                     <a-image
                         src="#linkedInLogo"
                         width="0.068" height="0.068"
@@ -854,9 +859,9 @@
                                    from: 0.45; to: 1.0; dur: 900;
                                    dir: alternate; easing: easeInOutSine; loop: true">
                     </a-image>
-                    <!-- Hit area: transparent plane (reliable raycaster target) -->
+                    <!-- Hit area: large transparent plane — covers entire image cell -->
                     <a-plane id="video-btn-1-plane" class="clickable"
-                        color="#FFFFFF" opacity="0" width="0.21" height="0.12">
+                        material="opacity: 0" width="0.28" height="0.18">
                     </a-plane>
                     <a-text value="Lunge Feeding" align="center" color="#DDDDDD"
                         scale="0.048 0.048 0.048" position="0 -0.038 0.005" wrap-count="18">
@@ -872,7 +877,7 @@
                                    dir: alternate; easing: easeInOutSine; loop: true; delay: 150">
                     </a-image>
                     <a-plane id="video-btn-2-plane" class="clickable"
-                        color="#FFFFFF" opacity="0" width="0.21" height="0.12">
+                        material="opacity: 0" width="0.28" height="0.18">
                     </a-plane>
                     <a-text value="Stationary Feeding" align="center" color="#DDDDDD"
                         scale="0.048 0.048 0.048" position="0 -0.038 0.005" wrap-count="18">
@@ -888,7 +893,7 @@
                                    dir: alternate; easing: easeInOutSine; loop: true; delay: 300">
                     </a-image>
                     <a-plane id="video-btn-3-plane" class="clickable"
-                        color="#FFFFFF" opacity="0" width="0.21" height="0.12">
+                        material="opacity: 0" width="0.28" height="0.18">
                     </a-plane>
                     <a-text value="Snipefish" align="center" color="#DDDDDD"
                         scale="0.048 0.048 0.048" position="0 -0.038 0.005" wrap-count="18">
@@ -904,7 +909,7 @@
                                    dir: alternate; easing: easeInOutSine; loop: true; delay: 450">
                     </a-image>
                     <a-plane id="video-btn-4-plane" class="clickable"
-                        color="#FFFFFF" opacity="0" width="0.21" height="0.12">
+                        material="opacity: 0" width="0.28" height="0.18">
                     </a-plane>
                     <a-text value="Aggregation" align="center" color="#DDDDDD"
                         scale="0.048 0.048 0.048" position="0 -0.038 0.005" wrap-count="18">
@@ -993,9 +998,9 @@
                                from: 0.45; to: 1.0; dur: 900;
                                dir: alternate; easing: easeInOutSine; loop: true">
                 </a-image>
-                <!-- Hit area: transparent plane (reliable raycaster target) -->
+                <!-- Hit area: large transparent plane — ergonomic tap target -->
                 <a-plane id="azores-hitbox" class="clickable"
-                    color="#FFFFFF" opacity="0" width="0.075" height="0.075">
+                    material="opacity: 0" width="0.14" height="0.14">
                 </a-plane>
             </a-entity>
 
