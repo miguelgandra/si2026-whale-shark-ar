@@ -72,25 +72,6 @@
         });
 
         // ============================================================
-        //  START AR
-        //  Called on the starter-overlay tap AFTER the scene has been
-        //  allowed to load silently (autoStart: false on mindar-image).
-        //  This defers MindAR's WebGL pipeline init until the user
-        //  taps, so the camera permission prompt appears immediately
-        //  instead of after a multi-second hang.
-        // ============================================================
-        function startAR() {
-            const scene = document.querySelector('a-scene');
-            if (scene.hasLoaded) {
-                scene.components['mindar-image-system'].start();
-            } else {
-                scene.addEventListener('loaded', () => {
-                    scene.components['mindar-image-system'].start();
-                }, { once: true });
-            }
-        }
-
-        // ============================================================
         //  Unlock HTML5 video elements for mobile browsers.
         //  Called once on the starter-overlay tap to satisfy the
         //  browser's "user gesture required" requirement for video.
@@ -530,7 +511,7 @@
     <!--  Satisfies mobile browser "user gesture" requirement and     -->
     <!--  unlocks video elements for later programmatic playback.     -->
     <!-- ============================================================ -->
-    <div id="starter-overlay" onclick="unlockVideos(); requestWakeLock(); startAR(); this.style.display='none';">
+    <div id="starter-overlay" onclick="unlockVideos(); requestWakeLock(); this.style.display='none';">
         <img src="media/SI2026-logo.png" class="conf-logo" alt="Sharks International 2026">
         <p class="conf-name">Sharks International 2026</p>
         <div class="shark-icon">🦈</div>
@@ -548,7 +529,6 @@
     <!-- ============================================================ -->
     <a-scene
         mindar-image="imageTargetSrc: targets.mind;
-                      autoStart: false;
                       filterMinCF: 0.0001;
                       filterBeta: 0.1;
                       missTolerance: 5;
@@ -569,22 +549,22 @@
                  it works on your target devices) -->
             <video id="videoLungeFeeding"
                 src="media/lunge-feeding.mp4"
-                preload="metadata" loop muted playsinline webkit-playsinline
+                preload="auto" loop muted playsinline webkit-playsinline
                 crossorigin="anonymous"></video>
 
             <video id="videoStationaryFeeding"
                 src="media/stationary-feeding.mp4"
-                preload="metadata" loop muted playsinline webkit-playsinline
+                preload="auto" loop muted playsinline webkit-playsinline
                 crossorigin="anonymous"></video>
 
             <video id="videoIntraspecific"
                 src="media/intraspecific-aggregation.mp4"
-                preload="metadata" loop muted playsinline webkit-playsinline
+                preload="auto" loop muted playsinline webkit-playsinline
                 crossorigin="anonymous"></video>
 
             <video id="videoSnipefish"
                 src="media/snipefish.mp4"
-                preload="metadata" loop muted playsinline webkit-playsinline
+                preload="auto" loop muted playsinline webkit-playsinline
                 crossorigin="anonymous"></video>
 
             <!-- 3D Models -->
@@ -593,7 +573,7 @@
             <a-asset-item id="iPilotModel"       src="3D%20models/iPilot.glb"></a-asset-item>
 
             <!-- Images -->
-            <img id="posterImage"   src="SI2026%20-%20poster-web.jpg"  crossorigin="anonymous">
+            <img id="posterImage"   src="SI2026%20-%20poster.jpg"  crossorigin="anonymous">
             <img id="profileImage"  src="media/profile.png"        crossorigin="anonymous">
             <img id="azoresMapImg"  src="media/azores-map.png"     crossorigin="anonymous">
             <img id="linkedInLogo"  src="media/linkedIn-logo.png"  crossorigin="anonymous">
