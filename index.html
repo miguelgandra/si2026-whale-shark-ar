@@ -72,6 +72,15 @@
         });
 
         // ============================================================
+        //  ATTRIBUTION OVERLAY
+        //  Toggled by the ⓘ button shown after the splash is dismissed.
+        // ============================================================
+        function toggleInfoOverlay() {
+            const overlay = document.getElementById('info-overlay');
+            overlay.style.display = overlay.style.display === 'block' ? 'none' : 'block';
+        }
+
+        // ============================================================
         //  Unlock HTML5 video elements for mobile browsers.
         //  Called once on the starter-overlay tap to satisfy the
         //  browser's "user gesture required" requirement for video.
@@ -105,22 +114,22 @@
         //  MATHS (verified for all four quadrants):
         //   angle θ = (t_ms / period_ms) × 2π
         //   x = radius × cos(θ)
-        //   z = +radius × sin(θ)          ← positive → CW from above
+        //   z = −radius × sin(θ)          ← negative → CCW from above
         //
-        //   CW orbit velocity tangent = (−sin θ, 0, cos θ)
+        //   CCW orbit velocity tangent = (−sin θ, 0, −cos θ)
         //
         //   For a −Z-forward GLTF model, world forward direction at Y-rot φ:
         //     (−sin φ, 0, −cos φ)
         //   Setting equal to tangent:
         //     −sin φ = −sin θ  →  sin φ = sin θ
-        //     −cos φ =  cos θ  →  cos φ = −cos θ
-        //   Solution: φ = π − θ
+        //     −cos φ = −cos θ  →  cos φ = cos θ
+        //   Solution: φ = θ
         //
         //   Verification at key angles:
-        //     θ=0   → yaw=π    → forward=(0,0,1)   ✓ moving in +Z
-        //     θ=π/2 → yaw=π/2  → forward=(−1,0,0)  ✓ moving in −X
-        //     θ=π   → yaw=0    → forward=(0,0,−1)  ✓ moving in −Z
-        //     θ=3π/2→ yaw=−π/2 → forward=(1,0,0)   ✓ moving in +X
+        //     θ=0   → yaw=0   → forward=(0,0,−1)  ✓ moving in −Z
+        //     θ=π/2 → yaw=π/2 → forward=(−1,0,0)  ✓ moving in −X
+        //     θ=π   → yaw=π   → forward=(0,0,1)   ✓ moving in +Z
+        //     θ=3π/2→ yaw=3π/2→ forward=(1,0,0)   ✓ moving in +X
         //
         //  modelYaw adjusts for non-standard model facing directions:
         //   −Z forward (GLTF standard) → modelYaw: 0    (default)
@@ -138,15 +147,15 @@
             tick: function (t) {
                 const angle = (t / this.data.period) * Math.PI * 2;
 
-                // Position — CW orbit; uses object3D directly for tick efficiency
+                // Position — CCW orbit; uses object3D directly for tick efficiency
                 this.el.object3D.position.set(
-                    Math.cos(angle) * this.data.radius,
+                    Math.cos(angle)  * this.data.radius,
                     this.data.yOffset,
-                    Math.sin(angle) * this.data.radius   // positive = CW from above
+                    -Math.sin(angle) * this.data.radius   // negative = CCW from above
                 );
 
-                // Y-rotation: φ = π − θ  (nose always leads on CW orbit)
-                const yawRad = Math.PI - angle + (this.data.modelYaw * Math.PI / 180);
+                // Y-rotation: φ = θ  (nose leads on CCW orbit, clean formula)
+                const yawRad = angle + (this.data.modelYaw * Math.PI / 180);
                 this.el.object3D.rotation.set(0, yawRad, 0);
             }
         });
@@ -210,8 +219,8 @@
                 this.activeVideoEl = null;
 
                 // ── Azores map system ────────────────────────────────
-                this.azoresHitbox = this.el.querySelector('#azores-hitbox');
-                this.azoresPopup  = this.el.querySelector('#azores-popup');
+                this.azoresTrigger = this.el.querySelector('#azores-trigger');
+                this.azoresPopup   = this.el.querySelector('#azores-popup');
 
                 // ── State ────────────────────────────────────────────
                 this.targetVisible = false;
@@ -226,7 +235,7 @@
                     this.iPilot.setAttribute('visible', true);
                     this.sideContent.setAttribute('visible', true);
                     this.videoButtons.setAttribute('visible', true);
-                    this.azoresHitbox.setAttribute('visible', true);
+                    this.azoresTrigger.setAttribute('visible', true);
                     // Defensively ensure overlay is hidden every time target is found.
                     // Prevents any MindAR/A-Frame initialisation race that might
                     // leave the overlay visible and blocking raycasts.
@@ -244,7 +253,7 @@
                     this.iPilot.setAttribute('visible', false);
                     this.sideContent.setAttribute('visible', false);
                     this.videoButtons.setAttribute('visible', false);
-                    this.azoresHitbox.setAttribute('visible', false);
+                    this.azoresTrigger.setAttribute('visible', false);
                     // Pause 3D model animations
                     this.whaleShark.setAttribute('animation-mixer', 'timeScale: 0');
                     this.fishParticle.setAttribute('animation-mixer', 'timeScale: 0');
@@ -423,8 +432,8 @@
                 // Tap the video screen itself to close
                 this.el.querySelector('#video-screen').addEventListener('click', this.onCloseVideo);
 
-                // Azores map — tap icon to open, tap map image to close
-                this.azoresHitbox.addEventListener('click', this.onAzoresClick);
+                // Azores map — tap icon to open (inner plane), tap map image to close
+                this.el.querySelector('#azores-hitbox').addEventListener('click', this.onAzoresClick);
                 this.el.querySelector('#map-image').addEventListener('click', this.onCloseMap);
             },
 
@@ -436,7 +445,7 @@
                 this.el.querySelector('#video-btn-3-plane')?.removeEventListener('click', this.onVideoBtn3);
                 this.el.querySelector('#video-btn-4-plane')?.removeEventListener('click', this.onVideoBtn4);
                 this.el.querySelector('#video-screen')?.removeEventListener('click', this.onCloseVideo);
-                this.azoresHitbox?.removeEventListener('click', this.onAzoresClick);
+                this.el.querySelector('#azores-hitbox')?.removeEventListener('click', this.onAzoresClick);
                 this.el.querySelector('#map-image')?.removeEventListener('click', this.onCloseMap);
             }
         });
@@ -499,6 +508,47 @@
             border-radius: 20px;
             margin-top: 6px;
         }
+
+        /* ── Attribution info button ─────────────────────────── */
+        #info-btn {
+            position: fixed;
+            bottom: 18px;
+            right: 18px;
+            width: 30px;
+            height: 30px;
+            background: rgba(0, 0, 0, 0.40);
+            color: #fff;
+            border-radius: 50%;
+            display: none;           /* revealed when splash is dismissed */
+            align-items: center;
+            justify-content: center;
+            font-size: 1.0em;
+            font-weight: 700;
+            cursor: pointer;
+            z-index: 500;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        /* ── Attribution info overlay ────────────────────────── */
+        #info-overlay {
+            position: fixed;
+            bottom: 56px;
+            left: 0;
+            right: 0;
+            background: rgba(245, 245, 245, 0.93);
+            color: #222;
+            padding: 12px 20px 10px;
+            font-size: 0.76em;
+            line-height: 1.75;
+            z-index: 500;
+            display: none;
+            border-top: 1px solid rgba(0, 0, 0, 0.10);
+            cursor: pointer;
+        }
+        #info-overlay p {
+            margin: 0;
+        }
     </style>
 </head>
 <body>
@@ -508,7 +558,7 @@
     <!--  Satisfies mobile browser "user gesture" requirement and     -->
     <!--  unlocks video elements for later programmatic playback.     -->
     <!-- ============================================================ -->
-    <div id="starter-overlay" onclick="unlockVideos(); requestWakeLock(); this.style.display='none';">
+    <div id="starter-overlay" onclick="unlockVideos(); requestWakeLock(); document.getElementById('info-btn').style.display='flex'; this.style.display='none';">
         <img src="media/SI2026-logo.png" class="conf-logo" alt="Sharks International 2026">
         <p class="conf-name">Sharks International 2026</p>
         <div class="shark-icon">🦈</div>
@@ -519,6 +569,20 @@
             to begin the AR experience.
         </p>
         <div class="tap-hint">Tap anywhere to start</div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!--  ATTRIBUTION OVERLAY                                         -->
+    <!--  ⓘ button (bottom-right) revealed after splash dismissal.   -->
+    <!--  Tapping it toggles the credits panel.                       -->
+    <!-- ============================================================ -->
+    <div id="info-btn" onclick="toggleInfoOverlay()">ⓘ</div>
+
+    <div id="info-overlay" onclick="toggleInfoOverlay()">
+        <p>Built with <strong>MindAR.js</strong> and <strong>A-Frame</strong>.</p>
+        <p>Whale Shark model by <strong>DigitalLife3D</strong> (CC BY-NC 4.0).</p>
+        <p>Fish Particle model by <strong>Loïc Norgeot</strong> (CC BY 4.0).</p>
+        <p>iPilot Tag model by the author.</p>
     </div>
 
     <!-- ============================================================ -->
@@ -574,6 +638,7 @@
             <img id="profileImage"  src="media/profile.png"        crossorigin="anonymous">
             <img id="azoresMapImg"  src="media/azores-map.png"     crossorigin="anonymous">
             <img id="linkedInLogo"  src="media/linkedIn-logo.png"  crossorigin="anonymous">
+            <img id="emailIcon"     src="media/email-icon.png"      crossorigin="anonymous">
             <img id="playIcon"      src="media/play-button-icon.png" crossorigin="anonymous">
             <img id="mapIcon"       src="media/map-icon.png"         crossorigin="anonymous">
 
@@ -666,7 +731,7 @@
                 id="fish-particle"
                 gltf-model="#fishParticleModel"
                 position="-0.33 0.35 0.05"
-                scale="0.3 0.3 0.3"
+                scale="0.20 0.20 0.20"
                 visible="false"
                 animation-mixer="clip: *; loop: repeat; timeScale: 0"
             ></a-entity>
@@ -723,54 +788,41 @@
                     wrap-count="18"
                 ></a-text>
 
-                <!-- Email Button -->
+                <!-- Email Button — icon only -->
                 <a-entity position="0 0.02 0.005">
                     <a-plane
                         class="clickable"
                         clickable="url: mailto:m3gandra@gmail.com"
                         color="#005f8e"
-                        width="0.38"
-                        height="0.07"
+                        width="0.10" height="0.10"
                         animation="property: material.opacity;
                                    from: 0.65; to: 1.0; dur: 750;
                                    dir: alternate; easing: easeInOutSine; loop: true"
                     ></a-plane>
-                    <a-text
-                        value="✉  m3gandra@gmail.com"
-                        align="center" color="#FFF"
-                        scale="0.065 0.065 0.065"
+                    <a-image
+                        src="#emailIcon"
+                        width="0.068" height="0.068"
                         position="0 0 0.01"
-                        wrap-count="24"
-                    ></a-text>
+                    ></a-image>
                 </a-entity>
 
-                <!-- LinkedIn Button -->
-                <a-entity position="0 -0.095 0.005">
+                <!-- LinkedIn Button — icon only -->
+                <a-entity position="0 -0.11 0.005">
                     <a-plane
                         class="clickable"
                         clickable="url: https://www.linkedin.com/in/miguel-gandra/"
                         color="#0077B5"
-                        width="0.38"
-                        height="0.07"
+                        width="0.10" height="0.10"
                         animation="property: material.opacity;
                                    from: 0.65; to: 1.0; dur: 750;
                                    dir: alternate; easing: easeInOutSine; loop: true;
                                    delay: 200"
                     ></a-plane>
-                    <!-- LinkedIn logo icon (left side) -->
                     <a-image
                         src="#linkedInLogo"
-                        width="0.048" height="0.048"
-                        position="-0.14 0 0.012"
+                        width="0.068" height="0.068"
+                        position="0 0 0.01"
                     ></a-image>
-                    <!-- Handle text — scale matches email button for uniform look -->
-                    <a-text
-                        value="miguel-gandra"
-                        align="left" color="#FFF"
-                        scale="0.065 0.065 0.065"
-                        position="-0.10 0 0.012"
-                        wrap-count="16"
-                    ></a-text>
                 </a-entity>
             </a-entity>
 
@@ -795,85 +847,68 @@
 
                 <!-- ─ Button 1: Lunge Feeding (top-left image) ─ -->
                 <a-entity position="0.143 -0.226 0.01">
-                    <a-image
-                        id="video-btn-1-plane"
-                        class="clickable"
-                        src="#playIcon"
-                        width="0.048" height="0.048"
-                        position="0 0.018 0"
+                    <!-- Visual: pulsing icon (no click handling) -->
+                    <a-image src="#playIcon" width="0.048" height="0.048"
+                        position="0 0.018 0.001"
                         animation="property: material.opacity;
                                    from: 0.45; to: 1.0; dur: 900;
-                                   dir: alternate; easing: easeInOutSine; loop: true"
-                    ></a-image>
-                    <a-text
-                        value="Lunge Feeding" align="center" color="#DDDDDD"
-                        scale="0.048 0.048 0.048"
-                        position="0 -0.038 0.005"
-                        wrap-count="18"
-                    ></a-text>
+                                   dir: alternate; easing: easeInOutSine; loop: true">
+                    </a-image>
+                    <!-- Hit area: transparent plane (reliable raycaster target) -->
+                    <a-plane id="video-btn-1-plane" class="clickable"
+                        color="#FFFFFF" opacity="0" width="0.21" height="0.12">
+                    </a-plane>
+                    <a-text value="Lunge Feeding" align="center" color="#DDDDDD"
+                        scale="0.048 0.048 0.048" position="0 -0.038 0.005" wrap-count="18">
+                    </a-text>
                 </a-entity>
 
                 <!-- ─ Button 2: Stationary Feeding (top-right image) ─ -->
                 <a-entity position="0.342 -0.226 0.01">
-                    <a-image
-                        id="video-btn-2-plane"
-                        class="clickable"
-                        src="#playIcon"
-                        width="0.048" height="0.048"
-                        position="0 0.018 0"
+                    <a-image src="#playIcon" width="0.048" height="0.048"
+                        position="0 0.018 0.001"
                         animation="property: material.opacity;
                                    from: 0.45; to: 1.0; dur: 900;
-                                   dir: alternate; easing: easeInOutSine; loop: true;
-                                   delay: 150"
-                    ></a-image>
-                    <a-text
-                        value="Stationary Feeding" align="center" color="#DDDDDD"
-                        scale="0.048 0.048 0.048"
-                        position="0 -0.038 0.005"
-                        wrap-count="18"
-                    ></a-text>
+                                   dir: alternate; easing: easeInOutSine; loop: true; delay: 150">
+                    </a-image>
+                    <a-plane id="video-btn-2-plane" class="clickable"
+                        color="#FFFFFF" opacity="0" width="0.21" height="0.12">
+                    </a-plane>
+                    <a-text value="Stationary Feeding" align="center" color="#DDDDDD"
+                        scale="0.048 0.048 0.048" position="0 -0.038 0.005" wrap-count="18">
+                    </a-text>
                 </a-entity>
 
                 <!-- ─ Button 3: Snipefish (bottom-left image) ─ -->
                 <a-entity position="0.143 -0.341 0.01">
-                    <a-image
-                        id="video-btn-3-plane"
-                        class="clickable"
-                        src="#playIcon"
-                        width="0.048" height="0.048"
-                        position="0 0.018 0"
+                    <a-image src="#playIcon" width="0.048" height="0.048"
+                        position="0 0.018 0.001"
                         animation="property: material.opacity;
                                    from: 0.45; to: 1.0; dur: 900;
-                                   dir: alternate; easing: easeInOutSine; loop: true;
-                                   delay: 300"
-                    ></a-image>
-                    <a-text
-                        value="Snipefish" align="center" color="#DDDDDD"
-                        scale="0.048 0.048 0.048"
-                        position="0 -0.038 0.005"
-                        wrap-count="18"
-                    ></a-text>
+                                   dir: alternate; easing: easeInOutSine; loop: true; delay: 300">
+                    </a-image>
+                    <a-plane id="video-btn-3-plane" class="clickable"
+                        color="#FFFFFF" opacity="0" width="0.21" height="0.12">
+                    </a-plane>
+                    <a-text value="Snipefish" align="center" color="#DDDDDD"
+                        scale="0.048 0.048 0.048" position="0 -0.038 0.005" wrap-count="18">
+                    </a-text>
                 </a-entity>
 
                 <!-- ─ Button 4: Intraspecific Aggregation (bottom-right image) ─ -->
                 <a-entity position="0.342 -0.341 0.01">
-                    <a-image
-                        id="video-btn-4-plane"
-                        class="clickable"
-                        src="#playIcon"
-                        width="0.048" height="0.048"
-                        position="0 0.018 0"
+                    <a-image src="#playIcon" width="0.048" height="0.048"
+                        position="0 0.018 0.001"
                         animation="property: material.opacity;
                                    from: 0.45; to: 1.0; dur: 900;
-                                   dir: alternate; easing: easeInOutSine; loop: true;
-                                   delay: 450"
-                    ></a-image>
-                    <a-text
-                        value="Aggregation" align="center" color="#DDDDDD"
-                        scale="0.048 0.048 0.048"
-                        position="0 -0.038 0.005"
-                        wrap-count="18"
-                    ></a-text>
+                                   dir: alternate; easing: easeInOutSine; loop: true; delay: 450">
+                    </a-image>
+                    <a-plane id="video-btn-4-plane" class="clickable"
+                        color="#FFFFFF" opacity="0" width="0.21" height="0.12">
+                    </a-plane>
+                    <a-text value="Aggregation" align="center" color="#DDDDDD"
+                        scale="0.048 0.048 0.048" position="0 -0.038 0.005" wrap-count="18">
+                    </a-text>
                 </a-entity>
 
 
@@ -944,26 +979,25 @@
             </a-entity><!-- end #video-popup -->
 
             <!-- ──────────────────────────────────────────────────── -->
-            <!--  AZORES MAP – PULSING MAP ICON HIT-ZONE              -->
+            <!--  AZORES MAP – PULSING ICON + HIT-ZONE WRAPPER        -->
             <!--                                                      -->
             <!--  ⚠ PROVISIONAL POSITION                              -->
             <!--  Estimated over the Azores map figure (upper area    -->
             <!--  of the poster, above the Foraging Ecology section). -->
-            <!--  Use coordinate-finder.html to click the centre of   -->
-            <!--  the map figure and paste the position here.         -->
+            <!--  Use coordinate-finder.html to verify and update.    -->
             <!-- ──────────────────────────────────────────────────── -->
-            <a-image
-                id="azores-hitbox"
-                class="clickable"
-                src="#mapIcon"
-                position="0.317 0.107 0.01"
-                width="0.060"
-                height="0.060"
-                visible="false"
-                animation="property: material.opacity;
-                           from: 0.45; to: 1.0; dur: 900;
-                           dir: alternate; easing: easeInOutSine; loop: true"
-            ></a-image>
+            <a-entity id="azores-trigger" position="0.317 0.107 0.01" visible="false">
+                <!-- Visual: pulsing map icon -->
+                <a-image src="#mapIcon" width="0.060" height="0.060"
+                    animation="property: material.opacity;
+                               from: 0.45; to: 1.0; dur: 900;
+                               dir: alternate; easing: easeInOutSine; loop: true">
+                </a-image>
+                <!-- Hit area: transparent plane (reliable raycaster target) -->
+                <a-plane id="azores-hitbox" class="clickable"
+                    color="#FFFFFF" opacity="0" width="0.075" height="0.075">
+                </a-plane>
+            </a-entity>
 
             <!-- ──────────────────────────────────────────────────── -->
             <!--  AZORES MAP POPUP PANEL                              -->
