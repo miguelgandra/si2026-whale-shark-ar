@@ -102,15 +102,25 @@
         //  tangential direction of travel — no matter where it is in
         //  the circle.
         //
-        //  MATHS (verified):
+        //  MATHS (verified for all four quadrants):
         //   angle θ = (t_ms / period_ms) × 2π
         //   x = radius × cos(θ)
-        //   z = +radius × sin(θ)          ← positive → CW from above (nose leads)
+        //   z = +radius × sin(θ)          ← positive → CW from above
         //
-        //   CW orbit tangent direction = (+sin θ, 0, −cos θ)
-        //   For a −Z-forward model, world Y-rot φ satisfying
-        //     (−sin φ, 0, −cos φ) = tangent
-        //   gives  φ = θ + π  →  yaw_deg = θ × (180/π) + 180
+        //   CW orbit velocity tangent = (−sin θ, 0, cos θ)
+        //
+        //   For a −Z-forward GLTF model, world forward direction at Y-rot φ:
+        //     (−sin φ, 0, −cos φ)
+        //   Setting equal to tangent:
+        //     −sin φ = −sin θ  →  sin φ = sin θ
+        //     −cos φ =  cos θ  →  cos φ = −cos θ
+        //   Solution: φ = π − θ
+        //
+        //   Verification at key angles:
+        //     θ=0   → yaw=π    → forward=(0,0,1)   ✓ moving in +Z
+        //     θ=π/2 → yaw=π/2  → forward=(−1,0,0)  ✓ moving in −X
+        //     θ=π   → yaw=0    → forward=(0,0,−1)  ✓ moving in −Z
+        //     θ=3π/2→ yaw=−π/2 → forward=(1,0,0)   ✓ moving in +X
         //
         //  modelYaw adjusts for non-standard model facing directions:
         //   −Z forward (GLTF standard) → modelYaw: 0    (default)
@@ -130,13 +140,13 @@
 
                 // Position — CW orbit; uses object3D directly for tick efficiency
                 this.el.object3D.position.set(
-                    Math.cos(angle)  * this.data.radius,
+                    Math.cos(angle) * this.data.radius,
                     this.data.yOffset,
-                    Math.sin(angle)  * this.data.radius   // positive = CW from above
+                    Math.sin(angle) * this.data.radius   // positive = CW from above
                 );
 
-                // Y-rotation — add π so nose (not tail) leads the CW tangent
-                const yawRad = angle + Math.PI + (this.data.modelYaw * Math.PI / 180);
+                // Y-rotation: φ = π − θ  (nose always leads on CW orbit)
+                const yawRad = Math.PI - angle + (this.data.modelYaw * Math.PI / 180);
                 this.el.object3D.rotation.set(0, yawRad, 0);
             }
         });
@@ -405,17 +415,17 @@
                 this.el.addEventListener('targetFound', this.onTargetFound);
                 this.el.addEventListener('targetLost',  this.onTargetLost);
 
-                // Video buttons — listeners on the <a-plane> elements that
-                // have geometry (class="clickable"), matching the example pattern.
+                // Video buttons — listeners on <a-image> elements (class="clickable")
                 this.el.querySelector('#video-btn-1-plane').addEventListener('click', this.onVideoBtn1);
                 this.el.querySelector('#video-btn-2-plane').addEventListener('click', this.onVideoBtn2);
                 this.el.querySelector('#video-btn-3-plane').addEventListener('click', this.onVideoBtn3);
                 this.el.querySelector('#video-btn-4-plane').addEventListener('click', this.onVideoBtn4);
-                this.el.querySelector('#close-video-plane').addEventListener('click', this.onCloseVideo);
+                // Tap the video screen itself to close
+                this.el.querySelector('#video-screen').addEventListener('click', this.onCloseVideo);
 
-                // Azores map
+                // Azores map — tap icon to open, tap map image to close
                 this.azoresHitbox.addEventListener('click', this.onAzoresClick);
-                this.el.querySelector('#close-map-plane').addEventListener('click', this.onCloseMap);
+                this.el.querySelector('#map-image').addEventListener('click', this.onCloseMap);
             },
 
             remove: function () {
@@ -425,9 +435,9 @@
                 this.el.querySelector('#video-btn-2-plane')?.removeEventListener('click', this.onVideoBtn2);
                 this.el.querySelector('#video-btn-3-plane')?.removeEventListener('click', this.onVideoBtn3);
                 this.el.querySelector('#video-btn-4-plane')?.removeEventListener('click', this.onVideoBtn4);
-                this.el.querySelector('#close-video-plane')?.removeEventListener('click', this.onCloseVideo);
+                this.el.querySelector('#video-screen')?.removeEventListener('click', this.onCloseVideo);
                 this.azoresHitbox?.removeEventListener('click', this.onAzoresClick);
-                this.el.querySelector('#close-map-plane')?.removeEventListener('click', this.onCloseMap);
+                this.el.querySelector('#map-image')?.removeEventListener('click', this.onCloseMap);
             }
         });
     </script>
@@ -565,6 +575,7 @@
             <img id="azoresMapImg"  src="media/azores-map.png"     crossorigin="anonymous">
             <img id="linkedInLogo"  src="media/linkedIn-logo.png"  crossorigin="anonymous">
             <img id="playIcon"      src="media/play-button-icon.png" crossorigin="anonymous">
+            <img id="mapIcon"       src="media/map-icon.png"         crossorigin="anonymous">
 
         </a-assets>
 
@@ -784,15 +795,15 @@
 
                 <!-- ─ Button 1: Lunge Feeding (top-left image) ─ -->
                 <a-entity position="0.143 -0.226 0.01">
-                    <a-plane
+                    <a-image
                         id="video-btn-1-plane"
                         class="clickable"
-                        color="#000000" opacity="0.45"
-                        width="0.21" height="0.12"
-                    ></a-plane>
-                    <a-image src="#playIcon"
-                        width="0.040" height="0.040"
-                        position="0 0.018 0.005"
+                        src="#playIcon"
+                        width="0.048" height="0.048"
+                        position="0 0.018 0"
+                        animation="property: material.opacity;
+                                   from: 0.45; to: 1.0; dur: 900;
+                                   dir: alternate; easing: easeInOutSine; loop: true"
                     ></a-image>
                     <a-text
                         value="Lunge Feeding" align="center" color="#DDDDDD"
@@ -804,15 +815,16 @@
 
                 <!-- ─ Button 2: Stationary Feeding (top-right image) ─ -->
                 <a-entity position="0.342 -0.226 0.01">
-                    <a-plane
+                    <a-image
                         id="video-btn-2-plane"
                         class="clickable"
-                        color="#000000" opacity="0.45"
-                        width="0.21" height="0.12"
-                    ></a-plane>
-                    <a-image src="#playIcon"
-                        width="0.040" height="0.040"
-                        position="0 0.018 0.005"
+                        src="#playIcon"
+                        width="0.048" height="0.048"
+                        position="0 0.018 0"
+                        animation="property: material.opacity;
+                                   from: 0.45; to: 1.0; dur: 900;
+                                   dir: alternate; easing: easeInOutSine; loop: true;
+                                   delay: 150"
                     ></a-image>
                     <a-text
                         value="Stationary Feeding" align="center" color="#DDDDDD"
@@ -824,15 +836,16 @@
 
                 <!-- ─ Button 3: Snipefish (bottom-left image) ─ -->
                 <a-entity position="0.143 -0.341 0.01">
-                    <a-plane
+                    <a-image
                         id="video-btn-3-plane"
                         class="clickable"
-                        color="#000000" opacity="0.45"
-                        width="0.21" height="0.12"
-                    ></a-plane>
-                    <a-image src="#playIcon"
-                        width="0.040" height="0.040"
-                        position="0 0.018 0.005"
+                        src="#playIcon"
+                        width="0.048" height="0.048"
+                        position="0 0.018 0"
+                        animation="property: material.opacity;
+                                   from: 0.45; to: 1.0; dur: 900;
+                                   dir: alternate; easing: easeInOutSine; loop: true;
+                                   delay: 300"
                     ></a-image>
                     <a-text
                         value="Snipefish" align="center" color="#DDDDDD"
@@ -844,15 +857,16 @@
 
                 <!-- ─ Button 4: Intraspecific Aggregation (bottom-right image) ─ -->
                 <a-entity position="0.342 -0.341 0.01">
-                    <a-plane
+                    <a-image
                         id="video-btn-4-plane"
                         class="clickable"
-                        color="#000000" opacity="0.45"
-                        width="0.21" height="0.12"
-                    ></a-plane>
-                    <a-image src="#playIcon"
-                        width="0.040" height="0.040"
-                        position="0 0.018 0.005"
+                        src="#playIcon"
+                        width="0.048" height="0.048"
+                        position="0 0.018 0"
+                        animation="property: material.opacity;
+                                   from: 0.45; to: 1.0; dur: 900;
+                                   dir: alternate; easing: easeInOutSine; loop: true;
+                                   delay: 450"
                     ></a-image>
                     <a-text
                         value="Aggregation" align="center" color="#DDDDDD"
@@ -903,9 +917,10 @@
                     wrap-count="30"
                 ></a-text>
 
-                <!-- Video screen — z=0.01 pushes it clear of any coplanar geometry -->
+                <!-- Video screen — clickable to close; z=0.01 clears coplanar geometry -->
                 <a-plane
                     id="video-screen"
+                    class="clickable"
                     material="shader: flat; src: #videoLungeFeeding"
                     width="0.82"
                     height="0.46"
@@ -919,51 +934,36 @@
                     position="0 -0.255 0"
                 ></a-plane>
                 <a-text
-                    value="Tap  ✕  to close"
+                    value="Tap video to close"
                     align="center" color="#7799BB"
                     scale="0.055 0.055 0.055"
                     position="0 -0.255 0.005"
                     wrap-count="28"
                 ></a-text>
 
-                <!-- Close button (top-right corner of popup) -->
-                <a-entity position="0.38 0.263 0.01">
-                    <a-plane
-                        id="close-video-plane"
-                        class="clickable"
-                        color="#CC2222" opacity="0.90"
-                        width="0.065" height="0.065"
-                        animation="property: material.opacity;
-                                   from: 0.55; to: 0.95; dur: 750;
-                                   dir: alternate; easing: easeInOutSine; loop: true"
-                    ></a-plane>
-                    <a-text value="✕" align="center" color="#FFF" scale="0.10 0.10 0.10" position="0 0 0.005"></a-text>
-                </a-entity>
-
             </a-entity><!-- end #video-popup -->
 
             <!-- ──────────────────────────────────────────────────── -->
-            <!--  AZORES MAP – INVISIBLE HIT-BOX                      -->
+            <!--  AZORES MAP – PULSING MAP ICON HIT-ZONE              -->
             <!--                                                      -->
             <!--  ⚠ PROVISIONAL POSITION                              -->
             <!--  Estimated over the Azores map figure (upper area    -->
             <!--  of the poster, above the Foraging Ecology section). -->
             <!--  Use coordinate-finder.html to click the centre of   -->
             <!--  the map figure and paste the position here.         -->
-            <!--                                                      -->
-            <!--  The plane has opacity="0" so it is invisible but    -->
-            <!--  still intercepts raycaster clicks when visible.     -->
             <!-- ──────────────────────────────────────────────────── -->
-            <a-plane
+            <a-image
                 id="azores-hitbox"
                 class="clickable"
+                src="#mapIcon"
                 position="0.317 0.107 0.01"
-                width="0.22"
-                height="0.20"
-                color="#FFFFFF"
-                opacity="0"
+                width="0.060"
+                height="0.060"
                 visible="false"
-            ></a-plane>
+                animation="property: material.opacity;
+                           from: 0.45; to: 1.0; dur: 900;
+                           dir: alternate; easing: easeInOutSine; loop: true"
+            ></a-image>
 
             <!-- ──────────────────────────────────────────────────── -->
             <!--  AZORES MAP POPUP PANEL                              -->
@@ -987,8 +987,10 @@
                     wrap-count="38"
                 ></a-text>
 
-                <!-- Map image plane — z=0.01 pushes it clear of any coplanar geometry -->
+                <!-- Map image plane — clickable to close; z=0.01 clears coplanar geometry -->
                 <a-plane
+                    id="map-image"
+                    class="clickable"
                     src="#azoresMapImg"
                     width="0.88"
                     height="0.66"
@@ -1002,26 +1004,12 @@
                     position="0 -0.32 0"
                 ></a-plane>
                 <a-text
-                    value="Tap  ✕  to close"
+                    value="Tap map to close"
                     align="center" color="#7799BB"
                     scale="0.055 0.055 0.055"
                     position="0 -0.32 0.005"
                     wrap-count="30"
                 ></a-text>
-
-                <!-- Close button -->
-                <a-entity position="0.41 0.363 0.01">
-                    <a-plane
-                        id="close-map-plane"
-                        class="clickable"
-                        color="#CC2222" opacity="0.90"
-                        width="0.065" height="0.065"
-                        animation="property: material.opacity;
-                                   from: 0.55; to: 0.95; dur: 750;
-                                   dir: alternate; easing: easeInOutSine; loop: true"
-                    ></a-plane>
-                    <a-text value="✕" align="center" color="#FFF" scale="0.10 0.10 0.10" position="0 0 0.005"></a-text>
-                </a-entity>
 
             </a-entity><!-- end #azores-popup -->
 
