@@ -182,6 +182,79 @@
         });
 
         // ============================================================
+        //  COMPONENT: ar-clickable
+        //  Diagnostic click handler for video and map buttons.
+        //
+        //  Responsibilities:
+        //   • Force material.transparent = false after texture load
+        //     (PNG icons auto-set transparent:true which can break raycasting)
+        //   • Log raycaster-intersected events so we can confirm the
+        //     raycaster is actually reaching each element
+        //   • Log click events and provide scale-flash visual feedback
+        //   • Dispatch named actions directly to ar-handler instance methods
+        // ============================================================
+        AFRAME.registerComponent('ar-clickable', {
+            schema: { action: { type: 'string', default: '' } },
+            init: function () {
+                const id = this.el.getAttribute('id') || this.el.tagName;
+                console.log('[ar-clickable] ✅ init — id:', id, '| action:', this.data.action);
+
+                // Force transparent:false so PNG alpha channel doesn't cause
+                // the raycaster to skip this element in intersection tests
+                const fixMaterial = () => {
+                    const mesh = this.el.getObject3D('mesh');
+                    if (!mesh) return;
+                    const apply = m => {
+                        if (!m) return;
+                        m.transparent = false;
+                        m.needsUpdate = true;
+                    };
+                    Array.isArray(mesh.material)
+                        ? mesh.material.forEach(apply)
+                        : apply(mesh.material);
+                    console.log('[ar-clickable] 🔧 transparent:false forced on', id);
+                };
+                this.el.addEventListener('object3dset', fixMaterial);
+                setTimeout(fixMaterial, 800); // fallback in case event already fired
+
+                // Raycaster diagnostic — fires when the cursor ray enters this element
+                this.el.addEventListener('raycaster-intersected', () =>
+                    console.log('[ar-clickable] ⚡ RAYCASTER HIT —', id));
+
+                // Click handler with scale-flash feedback
+                this.onClick = () => {
+                    console.log('[ar-clickable] 🖱️ CLICK —', id, '| action:', this.data.action);
+
+                    // Visual scale flash (1.3× for 180 ms)
+                    const obj = this.el.object3D;
+                    obj.scale.set(1.3, 1.3, 1.3);
+                    setTimeout(() => { if (obj) obj.scale.set(1, 1, 1); }, 180);
+
+                    // Dispatch to ar-handler
+                    const arEl = document.querySelector('[ar-handler]');
+                    if (!arEl || !arEl.components['ar-handler']) {
+                        console.error('[ar-clickable] ❌ ar-handler not found on scene');
+                        return;
+                    }
+                    const h = arEl.components['ar-handler'];
+                    switch (this.data.action) {
+                        case 'video1': h.openVideo('#videoLungeFeeding',      '▶  Lunge Feeding');            break;
+                        case 'video2': h.openVideo('#videoStationaryFeeding', '▶  Stationary Feeding');       break;
+                        case 'video3': h.openVideo('#videoSnipefish',         '▶  Snipefish');                break;
+                        case 'video4': h.openVideo('#videoIntraspecific',     '▶  Intraspecific Aggregation');break;
+                        case 'map':    h.openMap();                                                            break;
+                        default:       console.warn('[ar-clickable] Unknown action:', this.data.action);
+                    }
+                };
+                this.el.addEventListener('click', this.onClick);
+            },
+
+            remove: function () {
+                this.el.removeEventListener('click', this.onClick);
+            }
+        });
+
+        // ============================================================
         //  COMPONENT: ar-handler
         //  Main orchestrator for the SI2026 Whale Shark AR experience.
         //
@@ -421,28 +494,20 @@
                 this.el.addEventListener('targetFound', this.onTargetFound);
                 this.el.addEventListener('targetLost',  this.onTargetLost);
 
-                // Video buttons — solid-color <a-plane> hit targets (transparent:false = reliable raycasting)
-                this.el.querySelector('#video-btn-1-plane').addEventListener('click', this.onVideoBtn1);
-                this.el.querySelector('#video-btn-2-plane').addEventListener('click', this.onVideoBtn2);
-                this.el.querySelector('#video-btn-3-plane').addEventListener('click', this.onVideoBtn3);
-                this.el.querySelector('#video-btn-4-plane').addEventListener('click', this.onVideoBtn4);
+                // Video buttons and Azores trigger are now handled by ar-clickable
+                // components directly on the <a-image> elements (see HTML below).
+
                 // Tap the video screen itself to close
                 this.el.querySelector('#video-screen').addEventListener('click', this.onCloseVideo);
 
-                // Azores map — solid-color <a-plane> hit target to open, tap map image to close
-                this.el.querySelector('#azores-hitbox').addEventListener('click', this.onAzoresClick);
+                // Tap the map image to close
                 this.el.querySelector('#map-image').addEventListener('click', this.onCloseMap);
             },
 
             remove: function () {
                 this.el.removeEventListener('targetFound', this.onTargetFound);
                 this.el.removeEventListener('targetLost',  this.onTargetLost);
-                this.el.querySelector('#video-btn-1-plane')?.removeEventListener('click', this.onVideoBtn1);
-                this.el.querySelector('#video-btn-2-plane')?.removeEventListener('click', this.onVideoBtn2);
-                this.el.querySelector('#video-btn-3-plane')?.removeEventListener('click', this.onVideoBtn3);
-                this.el.querySelector('#video-btn-4-plane')?.removeEventListener('click', this.onVideoBtn4);
                 this.el.querySelector('#video-screen')?.removeEventListener('click', this.onCloseVideo);
-                this.el.querySelector('#azores-hitbox')?.removeEventListener('click', this.onAzoresClick);
                 this.el.querySelector('#map-image')?.removeEventListener('click', this.onCloseMap);
             }
         });
@@ -859,21 +924,18 @@
 
                 <!-- ─ Button 1: Lunge Feeding (top-left image) ─ -->
                 <a-entity position="0.143 -0.226 0.01">
-                    <!-- Visual: pulsing play icon — no click handling, no PNG-alpha raycaster issue -->
-                    <a-image src="#playIcon" width="0.048" height="0.048"
-                        position="0 0 0.001"
-                         animation="property: scale;
+                    <!-- Icon is the click target; ar-clickable handles dispatch + diagnostics -->
+                    <a-image id="video-btn-1-img"
+                        class="clickable"
+                        ar-clickable="action: video1"
+                        src="#playIcon"
+                        width="0.10" height="0.10"
+                        position="0 0.018 0.001"
+                        animation="property: scale;
                                    from: 1 1 1; to: 1.15 1.15 1;
                                    dur: 900;
-                                   dir: alternate; easing: easeInOutSine; loop: true; delay: 450"> 
+                                   dir: alternate; easing: easeInOutSine; loop: true; delay: 0">
                     </a-image>
-                    <!-- Hit area: solid-color plane — transparent:false, always raycaster-detectable -->
-                    <a-plane id="video-btn-1-plane" class="clickable"
-                        color="#0d2137" width="0.21" height="0.12"
-                        animation="property: material.opacity;
-                                   from: 0.35; to: 0.60; dur: 900;
-                                   dir: alternate; easing: easeInOutSine; loop: true">
-                    </a-plane>
                     <a-text value="Lunge Feeding" align="center" color="#DDDDDD"
                         scale="0.048 0.048 0.048" position="0 -0.038 0.005" wrap-count="18">
                     </a-text>
@@ -881,19 +943,17 @@
 
                 <!-- ─ Button 2: Stationary Feeding (top-right image) ─ -->
                 <a-entity position="0.342 -0.226 0.01">
-                    <a-image src="#playIcon" width="0.048" height="0.048"
-                        position="0 0 0.001"
-                         animation="property: scale;
+                    <a-image id="video-btn-2-img"
+                        class="clickable"
+                        ar-clickable="action: video2"
+                        src="#playIcon"
+                        width="0.10" height="0.10"
+                        position="0 0.018 0.001"
+                        animation="property: scale;
                                    from: 1 1 1; to: 1.15 1.15 1;
                                    dur: 900;
-                                   dir: alternate; easing: easeInOutSine; loop: true; delay: 450"> 
-                    </a-image>
-                    <a-plane id="video-btn-2-plane" class="clickable"
-                        color="#0d2137" width="0.21" height="0.12"
-                        animation="property: material.opacity;
-                                   from: 0.35; to: 0.60; dur: 900;
                                    dir: alternate; easing: easeInOutSine; loop: true; delay: 150">
-                    </a-plane>
+                    </a-image>
                     <a-text value="Stationary Feeding" align="center" color="#DDDDDD"
                         scale="0.048 0.048 0.048" position="0 -0.038 0.005" wrap-count="18">
                     </a-text>
@@ -901,19 +961,17 @@
 
                 <!-- ─ Button 3: Snipefish (bottom-left image) ─ -->
                 <a-entity position="0.143 -0.341 0.01">
-                    <a-image src="#playIcon" width="0.048" height="0.048"
-                        position="0 0 0.001"
-                         animation="property: scale;
+                    <a-image id="video-btn-3-img"
+                        class="clickable"
+                        ar-clickable="action: video3"
+                        src="#playIcon"
+                        width="0.10" height="0.10"
+                        position="0 0.018 0.001"
+                        animation="property: scale;
                                    from: 1 1 1; to: 1.15 1.15 1;
                                    dur: 900;
-                                   dir: alternate; easing: easeInOutSine; loop: true; delay: 450"> 
-                    </a-image>
-                    <a-plane id="video-btn-3-plane" class="clickable"
-                        color="#0d2137" width="0.21" height="0.12"
-                        animation="property: material.opacity;
-                                   from: 0.35; to: 0.60; dur: 900;
                                    dir: alternate; easing: easeInOutSine; loop: true; delay: 300">
-                    </a-plane>
+                    </a-image>
                     <a-text value="Snipefish" align="center" color="#DDDDDD"
                         scale="0.048 0.048 0.048" position="0 -0.038 0.005" wrap-count="18">
                     </a-text>
@@ -921,19 +979,17 @@
 
                 <!-- ─ Button 4: Intraspecific Aggregation (bottom-right image) ─ -->
                 <a-entity position="0.342 -0.341 0.01">
-                    <a-image src="#playIcon" width="0.048" height="0.048"
-                        position="0 0 0.001"
+                    <a-image id="video-btn-4-img"
+                        class="clickable"
+                        ar-clickable="action: video4"
+                        src="#playIcon"
+                        width="0.10" height="0.10"
+                        position="0 0.018 0.001"
                         animation="property: scale;
                                    from: 1 1 1; to: 1.15 1.15 1;
                                    dur: 900;
-                                   dir: alternate; easing: easeInOutSine; loop: true; delay: 450">         
-                    </a-image>
-                    <a-plane id="video-btn-4-plane" class="clickable"
-                        color="#0d2137" width="0.21" height="0.12"
-                        animation="property: material.opacity;
-                                   from: 0.35; to: 0.60; dur: 900;
                                    dir: alternate; easing: easeInOutSine; loop: true; delay: 450">
-                    </a-plane>
+                    </a-image>
                     <a-text value="Aggregation" align="center" color="#DDDDDD"
                         scale="0.048 0.048 0.048" position="0 -0.038 0.005" wrap-count="18">
                     </a-text>
@@ -1015,19 +1071,16 @@
             <!--  Use coordinate-finder.html to verify and update.    -->
             <!-- ──────────────────────────────────────────────────── -->
             <a-entity id="azores-trigger" position="0.317 0.107 0.01" visible="false">
-                <!-- Visual: pulsing map icon — no clickable class, no PNG-alpha raycaster issue -->
-                <a-image src="#mapIcon" width="0.060" height="0.060"
-                    animation="property: material.opacity;
-                               from: 0.45; to: 1.0; dur: 900;
+                <!-- Icon is the click target; ar-clickable handles dispatch + diagnostics -->
+                <a-image id="azores-img"
+                    class="clickable"
+                    ar-clickable="action: map"
+                    src="#mapIcon"
+                    width="0.10" height="0.10"
+                    animation="property: scale;
+                               from: 1 1 1; to: 1.15 1.15 1; dur: 900;
                                dir: alternate; easing: easeInOutSine; loop: true">
                 </a-image>
-                <!-- Hit area: solid-color plane — transparent:false, always raycaster-detectable -->
-                <a-plane id="azores-hitbox" class="clickable"
-                    color="#0d2137" width="0.10" height="0.10"
-                    animation="property: material.opacity;
-                               from: 0.35; to: 0.60; dur: 900;
-                               dir: alternate; easing: easeInOutSine; loop: true">
-                </a-plane>
             </a-entity>
 
             <!-- ──────────────────────────────────────────────────── -->
