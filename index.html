@@ -861,10 +861,11 @@
                 <a-entity position="0.143 -0.226 0.01">
                     <!-- Visual: pulsing play icon — no click handling, no PNG-alpha raycaster issue -->
                     <a-image src="#playIcon" width="0.048" height="0.048"
-                        position="0 0.018 0.001"
-                        animation="property: material.opacity;
-                                   from: 0.45; to: 1.0; dur: 900;
-                                   dir: alternate; easing: easeInOutSine; loop: true">
+                        position="0 0 0.001"
+                         animation="property: scale;
+                                   from: 1 1 1; to: 1.15 1.15 1;
+                                   dur: 900;
+                                   dir: alternate; easing: easeInOutSine; loop: true; delay: 450"> 
                     </a-image>
                     <!-- Hit area: solid-color plane — transparent:false, always raycaster-detectable -->
                     <a-plane id="video-btn-1-plane" class="clickable"
@@ -881,10 +882,11 @@
                 <!-- ─ Button 2: Stationary Feeding (top-right image) ─ -->
                 <a-entity position="0.342 -0.226 0.01">
                     <a-image src="#playIcon" width="0.048" height="0.048"
-                        position="0 0.018 0.001"
-                        animation="property: material.opacity;
-                                   from: 0.45; to: 1.0; dur: 900;
-                                   dir: alternate; easing: easeInOutSine; loop: true; delay: 150">
+                        position="0 0 0.001"
+                         animation="property: scale;
+                                   from: 1 1 1; to: 1.15 1.15 1;
+                                   dur: 900;
+                                   dir: alternate; easing: easeInOutSine; loop: true; delay: 450"> 
                     </a-image>
                     <a-plane id="video-btn-2-plane" class="clickable"
                         color="#0d2137" width="0.21" height="0.12"
@@ -900,10 +902,11 @@
                 <!-- ─ Button 3: Snipefish (bottom-left image) ─ -->
                 <a-entity position="0.143 -0.341 0.01">
                     <a-image src="#playIcon" width="0.048" height="0.048"
-                        position="0 0.018 0.001"
-                        animation="property: material.opacity;
-                                   from: 0.45; to: 1.0; dur: 900;
-                                   dir: alternate; easing: easeInOutSine; loop: true; delay: 300">
+                        position="0 0 0.001"
+                         animation="property: scale;
+                                   from: 1 1 1; to: 1.15 1.15 1;
+                                   dur: 900;
+                                   dir: alternate; easing: easeInOutSine; loop: true; delay: 450"> 
                     </a-image>
                     <a-plane id="video-btn-3-plane" class="clickable"
                         color="#0d2137" width="0.21" height="0.12"
@@ -919,10 +922,11 @@
                 <!-- ─ Button 4: Intraspecific Aggregation (bottom-right image) ─ -->
                 <a-entity position="0.342 -0.341 0.01">
                     <a-image src="#playIcon" width="0.048" height="0.048"
-                        position="0 0.018 0.001"
-                        animation="property: material.opacity;
-                                   from: 0.45; to: 1.0; dur: 900;
-                                   dir: alternate; easing: easeInOutSine; loop: true; delay: 450">
+                        position="0 0 0.001"
+                        animation="property: scale;
+                                   from: 1 1 1; to: 1.15 1.15 1;
+                                   dur: 900;
+                                   dir: alternate; easing: easeInOutSine; loop: true; delay: 450">         
                     </a-image>
                     <a-plane id="video-btn-4-plane" class="clickable"
                         color="#0d2137" width="0.21" height="0.12"
