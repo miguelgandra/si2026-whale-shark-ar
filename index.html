@@ -113,6 +113,46 @@
         }
 
         // ============================================================
+        //  vCard download helper (drawer "Save Contact" button).
+        //  Fetches contact.vcf and re-wraps it in a Blob with the
+        //  correct text/vcard MIME — required on iOS Safari so the
+        //  `download` attribute is honoured instead of rendering inline.
+        // ============================================================
+        function downloadVCard() {
+            const isDev = localStorage.getItem('is_developer') === 'true';
+            if (typeof gtag === 'function' && !isDev) {
+                gtag('event', 'vcard_downloaded', {
+                    event_category: 'AR Interaction',
+                    event_label: 'Miguel-Gandra.vcf (drawer)'
+                });
+            }
+
+            fetch('contact.vcf')
+                .then(r => r.text())
+                .then(text => {
+                    const blob = new Blob([text], { type: 'text/vcard;charset=utf-8' });
+                    const url  = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'Miguel-Gandra.vcf';
+                    a.rel = 'noopener';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    setTimeout(() => URL.revokeObjectURL(url), 2000);
+                })
+                .catch(err => {
+                    console.warn('vCard blob download failed, falling back to direct link:', err);
+                    const a = document.createElement('a');
+                    a.href = 'contact.vcf';
+                    a.download = 'Miguel-Gandra.vcf';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                });
+        }
+
+        // ============================================================
         //  Unlock HTML5 video elements for mobile browsers.
         //  Called once on the starter-overlay tap to satisfy the
         //  browser's "user gesture required" requirement for video.
@@ -635,6 +675,10 @@
         }
 
         /* ── Attribution info button ─────────────────────────── */
+        @keyframes info-pulse {
+            0%, 100% { opacity: 0.55; }
+            50%      { opacity: 1.0; }
+        }
         #info-btn {
             position: fixed;
             bottom: 18px;
@@ -653,6 +697,7 @@
             z-index: 500;
             -webkit-tap-highlight-color: transparent;
             user-select: none;
+            animation: info-pulse 2s ease-in-out infinite;
         }
 
         /* ── Info drawer (bottom sheet) ──────────────────────── */
@@ -807,6 +852,19 @@
             background: rgba(46, 160, 67, 0.35);
             border-color: rgba(46, 160, 67, 0.55);
         }
+        .drawer-btn--primary {
+            background: rgba(0, 95, 142, 0.55);
+            border-color: rgba(120, 200, 230, 0.45);
+            border-radius: 10px;
+            padding: 10px 20px;
+            font-size: 0.85em;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .drawer-btn--primary:active { background: rgba(0, 95, 142, 0.75); }
     </style>
 </head>
 <body>
@@ -863,6 +921,7 @@
                     </div>
                     <p>I am a Marine Biologist at CCMAR and IMAR (Portugal), having recently completed my PhD (Summa Cum Laude) in January 2026. As a PI funded by multiple NGOs (including the Save Our Seas and FAM Foundations), I lead and collaborate on national and international projects to advance marine megafauna conservation.</p>
                     <p>My work sits at the intersection of high-resolution biologging, computational biology, and big data. I am also dedicated to innovating Digital SciComm through novel tools and open-source development, transforming complex telemetry data into impactful stories for ocean protection.</p>
+                    <button class="drawer-btn drawer-btn--primary" onclick="downloadVCard()">💾 Save Contact</button>
                 </div>
             </details>
 
@@ -1113,22 +1172,27 @@
                     wrap-count="18"
                 ></a-text>
 
-                <!-- Save Contact Button — circular icon with scale pulse.
-                     Clicking triggers a download of contact.vcf (vCard). -->
-                <a-entity position="0 0.02 0.005">
-                    <a-circle
+                <!-- Save Contact Button — flat rounded rect with text label.
+                     Uses shader: flat (no lit darkening) and no texture asset,
+                     avoiding the SVG MIME/CORS issues seen with #contactIcon. -->
+                <a-entity position="0 0.02 0.005"
+                    animation="property: scale;
+                               from: 1.00 1.00 1; to: 1.08 1.08 1; dur: 1000;
+                               dir: alternate; easing: easeInOutSine; loop: true">
+                    <a-plane
                         class="clickable"
                         download-vcard="file: contact.vcf; filename: Miguel-Gandra.vcf"
-                        radius="0.055"
-                        animation="property: scale;
-                                   from: 1.05 1.05 1; to: 1.2 1.2 1; dur: 1000;
-                                   dir: alternate; easing: easeInOutSine; loop: true"
-                    ></a-circle>
-                    <a-image
-                        src="#contactIcon"
-                        width="0.060" height="0.060"
-                        position="0 0 0.01"
-                    ></a-image>
+                        material="shader: flat; color: #005f8e"
+                        width="0.22" height="0.062"
+                    ></a-plane>
+                    <a-text
+                        value="Save Contact"
+                        align="center"
+                        color="#FFFFFF"
+                        scale="0.07 0.07 0.07"
+                        position="0 0 0.001"
+                        wrap-count="20"
+                    ></a-text>
                 </a-entity>
 
                 <!-- LinkedIn Button — circular icon with scale pulse -->
@@ -1177,7 +1241,7 @@
                         ar-clickable="action: video1"
                         src="#playIcon"
                         opacity="0.5"
-                        width="0.075" height="0.075"
+                        width="0.060" height="0.060"
                         position="0 0.018 0.001"
                         animation="property: scale;
                                    from: 1 1 1; to: 1.15 1.15 1;
@@ -1196,7 +1260,7 @@
                         ar-clickable="action: video2"
                         src="#playIcon"
                         opacity="0.5"
-                        width="0.075" height="0.075"
+                        width="0.060" height="0.060"
                         position="0 0.018 0.001"
                         animation="property: scale;
                                    from: 1 1 1; to: 1.15 1.15 1;
@@ -1215,7 +1279,7 @@
                         ar-clickable="action: video3"
                         src="#playIcon"
                         opacity="0.5"
-                        width="0.075" height="0.075"
+                        width="0.060" height="0.060"
                         position="0 0.018 0.001"
                         animation="property: scale;
                                    from: 1 1 1; to: 1.15 1.15 1;
@@ -1234,7 +1298,7 @@
                         ar-clickable="action: video4"
                         src="#playIcon"
                         opacity="0.5"
-                        width="0.075" height="0.075"
+                        width="0.060" height="0.060"
                         position="0 0.018 0.001"
                         animation="property: scale;
                                    from: 1 1 1; to: 1.15 1.15 1;
@@ -1332,7 +1396,7 @@
                     ar-clickable="action: map"
                     src="#mapIcon"
                     opacity="0.5"
-                    width="0.075" height="0.075"
+                    width="0.060" height="0.060"
                     animation="property: scale;
                                from: 1 1 1; to: 1.15 1.15 1; dur: 900;
                                dir: alternate; easing: easeInOutSine; loop: true">
@@ -1366,7 +1430,7 @@
                 <a-plane
                     id="map-image"
                     visible="false"
-                    src="#azoresMapImg"
+                    material="shader: flat; src: #azoresMapImg"
                     width="0.88"
                     height="0.66"
                     position="0 0.01 0.01"
