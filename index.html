@@ -237,13 +237,27 @@
                         return;
                     }
                     const h = arEl.components['ar-handler'];
-                    switch (this.data.action) {
-                        case 'video1': h.openVideo('#videoLungeFeeding',      '▶  Lunge Feeding');            break;
-                        case 'video2': h.openVideo('#videoStationaryFeeding', '▶  Stationary Feeding');       break;
-                        case 'video3': h.openVideo('#videoSnipefish',         '▶  Snipefish');                break;
-                        case 'video4': h.openVideo('#videoIntraspecific',     '▶  Intraspecific Aggregation');break;
-                        case 'map':    h.openMap();                                                            break;
-                        default:       console.warn('[ar-clickable] Unknown action:', this.data.action);
+                    console.log('[ar-clickable] 🔎 handler refs — videoPopup:', !!h.videoPopup,
+                                '| azoresPopup:', !!h.azoresPopup,
+                                '| videoScreen:', !!h.videoScreen,
+                                '| panelOverlay:', !!h.panelOverlay,
+                                '| targetVisible:', h.targetVisible);
+                    try {
+                        switch (this.data.action) {
+                            case 'video1': h.openVideo('#videoLungeFeeding',      '▶  Lunge Feeding');            break;
+                            case 'video2': h.openVideo('#videoStationaryFeeding', '▶  Stationary Feeding');       break;
+                            case 'video3': h.openVideo('#videoSnipefish',         '▶  Snipefish');                break;
+                            case 'video4': h.openVideo('#videoIntraspecific',     '▶  Intraspecific Aggregation');break;
+                            case 'map':    h.openMap();                                                            break;
+                            default:       console.warn('[ar-clickable] Unknown action:', this.data.action);
+                        }
+                        console.log('[ar-clickable] ✔ dispatch completed for', this.data.action);
+                        // Post-dispatch visibility probe
+                        if (h.videoPopup) console.log('[ar-clickable] 📊 videoPopup visible attr:', h.videoPopup.getAttribute('visible'), '| object3D.visible:', h.videoPopup.object3D.visible);
+                        if (h.azoresPopup) console.log('[ar-clickable] 📊 azoresPopup visible attr:', h.azoresPopup.getAttribute('visible'), '| object3D.visible:', h.azoresPopup.object3D.visible);
+                        if (h.panelOverlay) console.log('[ar-clickable] 📊 panelOverlay visible attr:', h.panelOverlay.getAttribute('visible'), '| object3D.visible:', h.panelOverlay.object3D.visible);
+                    } catch (err) {
+                        console.error('[ar-clickable] 💥 dispatch threw:', err);
                     }
                 };
                 this.el.addEventListener('click', this.onClick);
@@ -362,6 +376,7 @@
                 //  label:   display name for the title bar
                 // ════════════════════════════════════════════════════
                 this.openVideo = (videoId, label) => {
+                    console.log('[openVideo] ▶ called —', videoId, label);
                     // Pause and reset any previously active video
                     if (this.activeVideoEl) {
                         this.activeVideoEl.pause();
@@ -369,8 +384,10 @@
                     }
                     // Point video screen at the new source
                     this.activeVideoEl = document.querySelector(videoId);
+                    console.log('[openVideo] activeVideoEl found:', !!this.activeVideoEl);
                     this.videoScreen.setAttribute('material', 'src', videoId);
                     this.videoScreen.setAttribute('material', 'shader', 'flat');
+                    console.log('[openVideo] material set on video-screen');
                     // Update title label
                     if (this.videoTitle) this.videoTitle.setAttribute('value', label);
                     // Hide 3D models while popup is open
@@ -378,6 +395,13 @@
                     // Show popup + overlay
                     this.videoPopup.setAttribute('visible', true);
                     this.panelOverlay.setAttribute('visible', true);
+                    console.log('[openVideo] visibility set — videoPopup:', this.videoPopup.getAttribute('visible'), '| object3D.visible:', this.videoPopup.object3D.visible);
+                    // Walk up the parents to check for hidden ancestor
+                    let p = this.videoPopup.parentEl;
+                    while (p) {
+                        console.log('[openVideo] ancestor', p.tagName, p.id || '', 'visible attr:', p.getAttribute('visible'), '| object3D.visible:', p.object3D?.visible);
+                        p = p.parentEl;
+                    }
                     // Play
                     if (this.activeVideoEl) {
                         this.activeVideoEl.play().catch(e =>
@@ -403,6 +427,7 @@
                 //  AZORES MAP POPUP LOGIC
                 // ════════════════════════════════════════════════════
                 this.openMap = () => {
+                    console.log('[openMap] 🗺 called');
                     // Close video if open
                     if (this.activeVideoEl) {
                         this.activeVideoEl.pause();
@@ -414,6 +439,12 @@
                     this.hideModels();
                     this.azoresPopup.setAttribute('visible', true);
                     this.panelOverlay.setAttribute('visible', true);
+                    console.log('[openMap] visibility set — azoresPopup:', this.azoresPopup.getAttribute('visible'), '| object3D.visible:', this.azoresPopup.object3D.visible);
+                    let p = this.azoresPopup.parentEl;
+                    while (p) {
+                        console.log('[openMap] ancestor', p.tagName, p.id || '', 'visible attr:', p.getAttribute('visible'), '| object3D.visible:', p.object3D?.visible);
+                        p = p.parentEl;
+                    }
                     console.log('🗺 Azores map opened.');
                 };
 
