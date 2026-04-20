@@ -76,8 +76,40 @@
         //  Toggled by the ⓘ button shown after the splash is dismissed.
         // ============================================================
         function toggleInfoOverlay() {
-            const overlay = document.getElementById('info-overlay');
-            overlay.style.display = overlay.style.display === 'block' ? 'none' : 'block';
+            const drawer = document.getElementById('info-drawer');
+            const isOpen = drawer.classList.toggle('open');
+            drawer.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+        }
+
+        // Copies the conference tag bundle to clipboard and briefly updates the
+        // button label as visual confirmation. Falls back to a textarea-based
+        // copy for environments without navigator.clipboard (older iOS Safari).
+        function copyTagBundle(btn) {
+            const text = '#SI2026 @sharks.international @miguelgandra @okeanos_uac @movecons.research @ccmar.algarve';
+            const done = () => {
+                const original = btn.textContent;
+                btn.textContent = '✅ Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = original;
+                    btn.classList.remove('copied');
+                }, 2000);
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+            } else {
+                fallbackCopy(text, done);
+            }
+        }
+        function fallbackCopy(text, done) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); done(); } catch (e) { /* silent */ }
+            document.body.removeChild(ta);
         }
 
         // ============================================================
@@ -623,27 +655,157 @@
             user-select: none;
         }
 
-        /* ── Attribution info overlay ────────────────────────── */
-        #info-overlay {
+        /* ── Info drawer (bottom sheet) ──────────────────────── */
+        /* Slides up from the bottom of the viewport when "ⓘ" is tapped.
+           Uses transform-only animation so the panel never occupies hit-area
+           while closed, leaving the AR scene fully interactive. */
+        #info-drawer {
             position: fixed;
-            bottom: 56px;
-            left: 0;
-            right: 0;
-            background: rgba(10, 10, 10, 0.55);
-            color: #d8d8d8;
-            padding: 12px 20px 10px;
-            font-size: 0.76em;
+            left: 0; right: 0; bottom: 0;
+            max-height: 75vh;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            color: #e5e5e5;
             font-weight: 300;
-            line-height: 1.75;
-            z-index: 500;
-            display: none;
             border-top: 1px solid rgba(255, 255, 255, 0.10);
-            cursor: pointer;
-            backdrop-filter: blur(6px);
-            -webkit-backdrop-filter: blur(6px);
+            border-radius: 18px 18px 0 0;
+            transform: translateY(100%);
+            transition: transform 320ms cubic-bezier(0.32, 0.72, 0.2, 1);
+            z-index: 600;
+            display: flex;
+            flex-direction: column;
         }
-        #info-overlay p {
+        #info-drawer.open { transform: translateY(0); }
+
+        .drawer-handle {
+            width: 44px; height: 4px;
+            background: rgba(255, 255, 255, 0.35);
+            border-radius: 2px;
+            margin: 10px auto 6px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .drawer-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 4px 18px 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            flex-shrink: 0;
+        }
+        .drawer-header h2 {
             margin: 0;
+            font-size: 0.95em;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+            color: #ffffff;
+        }
+        .drawer-close {
+            background: none; border: none;
+            color: #cfcfcf;
+            font-size: 1.4em; line-height: 1;
+            cursor: pointer;
+            padding: 4px 10px;
+            border-radius: 6px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .drawer-close:active { background: rgba(255, 255, 255, 0.10); }
+
+        .drawer-scroll {
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 4px 18px 24px;
+        }
+
+        /* Accordions — native <details>/<summary> for zero-JS semantics */
+        .accordion {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+            padding: 4px 0;
+        }
+        .accordion > summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 12px 0;
+            font-size: 0.88em;
+            font-weight: 400;
+            letter-spacing: 0.02em;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .accordion > summary::-webkit-details-marker { display: none; }
+        .accordion > summary::after {
+            content: "⌄";
+            font-size: 1.1em;
+            transition: transform 220ms ease;
+            color: rgba(255, 255, 255, 0.55);
+        }
+        .accordion[open] > summary::after { transform: rotate(180deg); }
+
+        .acc-body {
+            font-size: 0.78em;
+            line-height: 1.65;
+            color: #d0d0d0;
+            padding: 2px 2px 14px;
+        }
+        .acc-body p { margin: 0 0 8px; }
+        .acc-body ul { margin: 0; padding-left: 18px; }
+        .acc-body li { margin: 2px 0; }
+
+        /* Researcher row (photo + name) */
+        .researcher-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+        .researcher-header img {
+            width: 64px; height: 64px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            flex-shrink: 0;
+        }
+        .researcher-name strong {
+            display: block;
+            color: #ffffff;
+            font-weight: 500;
+            font-size: 1.05em;
+            letter-spacing: 0.01em;
+        }
+        .researcher-name span {
+            display: block;
+            font-size: 0.88em;
+            color: #9ec9e0;
+            margin-top: 2px;
+        }
+
+        .handles {
+            font-size: 0.78em;
+            color: #9ec9e0;
+            word-break: break-word;
+        }
+
+        .drawer-btn {
+            margin-top: 6px;
+            background: rgba(255, 255, 255, 0.10);
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 999px;
+            padding: 8px 16px;
+            font-size: 0.80em;
+            font-weight: 400;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            transition: background 180ms ease, border-color 180ms ease;
+        }
+        .drawer-btn:active { background: rgba(255, 255, 255, 0.20); }
+        .drawer-btn.copied {
+            background: rgba(46, 160, 67, 0.35);
+            border-color: rgba(46, 160, 67, 0.55);
         }
     </style>
 </head>
@@ -674,11 +836,68 @@
     <!-- ============================================================ -->
     <div id="info-btn" onclick="toggleInfoOverlay()">ⓘ</div>
 
-    <div id="info-overlay" onclick="toggleInfoOverlay()">
-        <p>Built with <strong>MindAR.js</strong> and <strong>A-Frame</strong>.</p>
-        <p>Whale Shark model by DigitalLife3D (CC BY-NC 4.0).</p>
-        <p>Fish Particle model by Loïc Norgeot (CC BY 4.0).</p>
-        <p>iPilot Tag model by the author.</p>
+    <!-- ============================================================ -->
+    <!--  INFO DRAWER (Bottom Sheet)                                  -->
+    <!--  Slides up from the bottom when "ⓘ" is tapped. Does not      -->
+    <!--  block the AR scene above it — no full-screen backdrop.      -->
+    <!-- ============================================================ -->
+    <div id="info-drawer" aria-hidden="true">
+        <div class="drawer-handle" onclick="toggleInfoOverlay()"></div>
+        <div class="drawer-header">
+            <h2>Information Hub</h2>
+            <button class="drawer-close" onclick="toggleInfoOverlay()" aria-label="Close">×</button>
+        </div>
+
+        <div class="drawer-scroll">
+
+            <!-- Section 1 — About the Researcher -->
+            <details class="accordion">
+                <summary>👤 About the Researcher</summary>
+                <div class="acc-body">
+                    <div class="researcher-header">
+                        <img src="media/profile2.png" alt="Miguel Gandra">
+                        <div class="researcher-name">
+                            <strong>Miguel Gandra, PhD</strong>
+                            <span>Marine Biology Researcher · CCMAR &amp; IMAR</span>
+                        </div>
+                    </div>
+                    <p>I am a Marine Biologist at CCMAR and IMAR (Portugal), having recently completed my PhD (Summa Cum Laude) in January 2026. As a PI funded by multiple NGOs (including the Save Our Seas and FAM Foundations), I lead and collaborate on national and international projects to advance marine megafauna conservation.</p>
+                    <p>My work sits at the intersection of high-resolution biologging, computational biology, and big data. I am also dedicated to innovating Digital SciComm through novel tools and open-source development, transforming complex telemetry data into impactful stories for ocean protection.</p>
+                </div>
+            </details>
+
+            <!-- Section 2 — Capture & Share -->
+            <details class="accordion">
+                <summary>📸 Capture &amp; Share</summary>
+                <div class="acc-body">
+                    <p><em>Record, share, and tag us — help us track curiosity, not just sharks.</em></p>
+                    <p>Swipe to open your screen recorder and capture the Whale Shark in action. Tag your stories with <strong>#SI2026</strong> and join our community:</p>
+                    <p class="handles">@sharks.international · @miguelgandra · @okeanos_uac · @movecons.research · @ccmar.algarve</p>
+                    <button id="copy-tags-btn" class="drawer-btn" onclick="copyTagBundle(this)">📋 Copy tag bundle</button>
+                </div>
+            </details>
+
+            <!-- Section 3 — 3D Model Credits -->
+            <details class="accordion">
+                <summary>🧊 3D Model Credits</summary>
+                <div class="acc-body">
+                    <ul>
+                        <li><strong>Whale Shark:</strong> DigitalLife3D (CC BY-NC 4.0)</li>
+                        <li><strong>Fish School:</strong> Loïc Norgeot (CC BY 4.0)</li>
+                        <li><strong>iPilot Tag:</strong> Created by the author.</li>
+                    </ul>
+                </div>
+            </details>
+
+            <!-- Section 4 — Technology -->
+            <details class="accordion">
+                <summary>⚙ Technology</summary>
+                <div class="acc-body">
+                    <p>Built with <strong>MindAR.js</strong> for spatial tracking and <strong>A-Frame</strong> for 3D rendering. This experience is designed for mobile WebAR browser environments.</p>
+                </div>
+            </details>
+
+        </div>
     </div>
 
     <!-- ============================================================ -->
@@ -822,7 +1041,7 @@
                     id="whale-shark"
                     gltf-model="#whaleSharkModel"
                     orbit-swimmer="radius: 0.65; period: 20000; modelYaw: 0"
-                    scale="0.12 0.12 0.12"
+                    scale="0.15 0.15 0.15"
                     animation-mixer="clip: *; loop: repeat; timeScale: 0"
                 ></a-entity>
             </a-entity>
