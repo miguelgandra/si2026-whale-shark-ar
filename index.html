@@ -392,9 +392,11 @@
                     if (this.videoTitle) this.videoTitle.setAttribute('value', label);
                     // Hide 3D models while popup is open
                     this.hideModels();
-                    // Show popup + overlay + close-target plane
+                    // Show popup + overlay + close-target plane, and make the
+                    // close plane click-able (class toggled so raycaster picks it up)
                     this.videoPopup.setAttribute('visible', true);
                     this.videoScreen.setAttribute('visible', true);
+                    this.videoScreen.classList.add('clickable');
                     this.panelOverlay.setAttribute('visible', true);
                     console.log('[openVideo] visibility set — videoPopup:', this.videoPopup.getAttribute('visible'), '| object3D.visible:', this.videoPopup.object3D.visible);
                     // Walk up the parents to check for hidden ancestor
@@ -419,6 +421,7 @@
                     }
                     this.videoPopup.setAttribute('visible', false);
                     this.videoScreen.setAttribute('visible', false);
+                    this.videoScreen.classList.remove('clickable');
                     this.panelOverlay.setAttribute('visible', false);
                     // Restore 3D models now that popup is closed
                     this.showModels();
@@ -437,11 +440,14 @@
                         this.activeVideoEl = null;
                         this.videoPopup.setAttribute('visible', false);
                         this.videoScreen.setAttribute('visible', false);
+                        this.videoScreen.classList.remove('clickable');
                     }
                     // Hide 3D models while popup is open
                     this.hideModels();
                     this.azoresPopup.setAttribute('visible', true);
-                    this.el.querySelector('#map-image').setAttribute('visible', true);
+                    const mapImg = this.el.querySelector('#map-image');
+                    mapImg.setAttribute('visible', true);
+                    mapImg.classList.add('clickable');
                     this.panelOverlay.setAttribute('visible', true);
                     console.log('[openMap] visibility set — azoresPopup:', this.azoresPopup.getAttribute('visible'), '| object3D.visible:', this.azoresPopup.object3D.visible);
                     let p = this.azoresPopup.parentEl;
@@ -454,7 +460,9 @@
 
                 this.closeMap = () => {
                     this.azoresPopup.setAttribute('visible', false);
-                    this.el.querySelector('#map-image').setAttribute('visible', false);
+                    const mapImg = this.el.querySelector('#map-image');
+                    mapImg.setAttribute('visible', false);
+                    mapImg.classList.remove('clickable');
                     this.panelOverlay.setAttribute('visible', false);
                     // Restore 3D models now that popup is closed
                     this.showModels();
@@ -472,9 +480,13 @@
                     }
                     this.videoPopup.setAttribute('visible', false);
                     this.videoScreen.setAttribute('visible', false);
+                    this.videoScreen.classList.remove('clickable');
                     this.azoresPopup.setAttribute('visible', false);
                     const mapImg = this.el.querySelector('#map-image');
-                    if (mapImg) mapImg.setAttribute('visible', false);
+                    if (mapImg) {
+                        mapImg.setAttribute('visible', false);
+                        mapImg.classList.remove('clickable');
+                    }
                     this.panelOverlay.setAttribute('visible', false);
                     // Restore models (guard inside showModels checks targetVisible)
                     this.showModels();
@@ -1075,14 +1087,13 @@
                     wrap-count="30"
                 ></a-text>
 
-                <!-- Video screen — clickable to close; z=0.01 clears coplanar geometry -->
-                <!-- visible=false initially so the raycaster doesn't hit this plane
-                     (and steal clicks from the buttons behind it) when the popup
-                     is closed. openVideo/closeVideo toggle this in sync with the
-                     parent popup. -->
+                <!-- Video screen — close target while popup is open.
+                     NO `clickable` class in HTML: openVideo adds it, closeVideo
+                     removes it. Three.js raycaster hits meshes regardless of
+                     their .visible flag, so we must actually exclude the element
+                     from the raycaster's target selector list. -->
                 <a-plane
                     id="video-screen"
-                    class="clickable"
                     visible="false"
                     material="shader: flat; src: #videoLungeFeeding"
                     width="0.82"
@@ -1149,12 +1160,10 @@
                     wrap-count="38"
                 ></a-text>
 
-                <!-- Map image plane — clickable to close; z=0.01 clears coplanar geometry -->
-                <!-- Same fix as #video-screen: visible=false initially so it can't
-                     steal clicks from the map trigger / video buttons. -->
+                <!-- Map image plane — same pattern as #video-screen.
+                     No `clickable` class here; openMap adds it, closeMap removes it. -->
                 <a-plane
                     id="map-image"
-                    class="clickable"
                     visible="false"
                     src="#azoresMapImg"
                     width="0.88"
