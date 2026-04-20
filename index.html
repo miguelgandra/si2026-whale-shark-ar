@@ -182,6 +182,40 @@
         });
 
         // ============================================================
+        //  COMPONENT: download-vcard
+        //  Triggers a direct download of a .vcf contact card.
+        //  Attached to the "Save Contact" button on the profile panel.
+        // ============================================================
+        AFRAME.registerComponent('download-vcard', {
+            schema: {
+                file:     { type: 'string', default: 'contact.vcf' },
+                filename: { type: 'string', default: 'Miguel-Gandra.vcf' }
+            },
+            init: function () {
+                this.onClick = () => {
+                    // GA4 tracking
+                    const isDev = localStorage.getItem('is_developer') === 'true';
+                    if (typeof gtag === 'function' && !isDev) {
+                        gtag('event', 'vcard_downloaded', {
+                            event_category: 'AR Interaction',
+                            event_label: this.data.filename
+                        });
+                    }
+                    // Trigger download via a temporary anchor
+                    const a = document.createElement('a');
+                    a.href = this.data.file;
+                    a.download = this.data.filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    console.log('📇 vCard download triggered:', this.data.file);
+                };
+                this.el.addEventListener('click', this.onClick);
+            },
+            remove: function () { this.el.removeEventListener('click', this.onClick); }
+        });
+
+        // ============================================================
         //  COMPONENT: ar-clickable
         //  Diagnostic click handler for video and map buttons.
         //
@@ -199,65 +233,23 @@
                 const id = this.el.getAttribute('id') || this.el.tagName;
                 console.log('[ar-clickable] ✅ init — id:', id, '| action:', this.data.action);
 
-                // Force transparent:false so PNG alpha channel doesn't cause
-                // the raycaster to skip this element in intersection tests
-                const fixMaterial = () => {
-                    const mesh = this.el.getObject3D('mesh');
-                    if (!mesh) return;
-                    const apply = m => {
-                        if (!m) return;
-                        m.transparent = false;
-                        m.needsUpdate = true;
-                    };
-                    Array.isArray(mesh.material)
-                        ? mesh.material.forEach(apply)
-                        : apply(mesh.material);
-                    console.log('[ar-clickable] 🔧 transparent:false forced on', id);
-                };
-                this.el.addEventListener('object3dset', fixMaterial);
-                setTimeout(fixMaterial, 800); // fallback in case event already fired
-
-                // Raycaster diagnostic — fires when the cursor ray enters this element
-                this.el.addEventListener('raycaster-intersected', () =>
-                    console.log('[ar-clickable] ⚡ RAYCASTER HIT —', id));
-
                 // Click handler with scale-flash feedback
                 this.onClick = () => {
-                    console.log('[ar-clickable] 🖱️ CLICK —', id, '| action:', this.data.action);
-
-                    // Visual scale flash (1.3× for 180 ms)
+                    // Visual scale flash (1.3× for 180 ms) as tap feedback
                     const obj = this.el.object3D;
                     obj.scale.set(1.3, 1.3, 1.3);
                     setTimeout(() => { if (obj) obj.scale.set(1, 1, 1); }, 180);
 
                     // Dispatch to ar-handler
                     const arEl = document.querySelector('[ar-handler]');
-                    if (!arEl || !arEl.components['ar-handler']) {
-                        console.error('[ar-clickable] ❌ ar-handler not found on scene');
-                        return;
-                    }
+                    if (!arEl || !arEl.components['ar-handler']) return;
                     const h = arEl.components['ar-handler'];
-                    console.log('[ar-clickable] 🔎 handler refs — videoPopup:', !!h.videoPopup,
-                                '| azoresPopup:', !!h.azoresPopup,
-                                '| videoScreen:', !!h.videoScreen,
-                                '| panelOverlay:', !!h.panelOverlay,
-                                '| targetVisible:', h.targetVisible);
-                    try {
-                        switch (this.data.action) {
-                            case 'video1': h.openVideo('#videoLungeFeeding',      '▶  Lunge Feeding');            break;
-                            case 'video2': h.openVideo('#videoStationaryFeeding', '▶  Stationary Feeding');       break;
-                            case 'video3': h.openVideo('#videoSnipefish',         '▶  Snipefish');                break;
-                            case 'video4': h.openVideo('#videoIntraspecific',     '▶  Intraspecific Aggregation');break;
-                            case 'map':    h.openMap();                                                            break;
-                            default:       console.warn('[ar-clickable] Unknown action:', this.data.action);
-                        }
-                        console.log('[ar-clickable] ✔ dispatch completed for', this.data.action);
-                        // Post-dispatch visibility probe
-                        if (h.videoPopup) console.log('[ar-clickable] 📊 videoPopup visible attr:', h.videoPopup.getAttribute('visible'), '| object3D.visible:', h.videoPopup.object3D.visible);
-                        if (h.azoresPopup) console.log('[ar-clickable] 📊 azoresPopup visible attr:', h.azoresPopup.getAttribute('visible'), '| object3D.visible:', h.azoresPopup.object3D.visible);
-                        if (h.panelOverlay) console.log('[ar-clickable] 📊 panelOverlay visible attr:', h.panelOverlay.getAttribute('visible'), '| object3D.visible:', h.panelOverlay.object3D.visible);
-                    } catch (err) {
-                        console.error('[ar-clickable] 💥 dispatch threw:', err);
+                    switch (this.data.action) {
+                        case 'video1': h.openVideo('#videoLungeFeeding',      '▶  Lunge Feeding');            break;
+                        case 'video2': h.openVideo('#videoStationaryFeeding', '▶  Stationary Feeding');       break;
+                        case 'video3': h.openVideo('#videoSnipefish',         '▶  Snipefish');                break;
+                        case 'video4': h.openVideo('#videoIntraspecific',     '▶  Intraspecific Aggregation');break;
+                        case 'map':    h.openMap();                                                            break;
                     }
                 };
                 this.el.addEventListener('click', this.onClick);
@@ -376,7 +368,6 @@
                 //  label:   display name for the title bar
                 // ════════════════════════════════════════════════════
                 this.openVideo = (videoId, label) => {
-                    console.log('[openVideo] ▶ called —', videoId, label);
                     // Pause and reset any previously active video
                     if (this.activeVideoEl) {
                         this.activeVideoEl.pause();
@@ -384,27 +375,18 @@
                     }
                     // Point video screen at the new source
                     this.activeVideoEl = document.querySelector(videoId);
-                    console.log('[openVideo] activeVideoEl found:', !!this.activeVideoEl);
                     this.videoScreen.setAttribute('material', 'src', videoId);
                     this.videoScreen.setAttribute('material', 'shader', 'flat');
-                    console.log('[openVideo] material set on video-screen');
                     // Update title label
                     if (this.videoTitle) this.videoTitle.setAttribute('value', label);
                     // Hide 3D models while popup is open
                     this.hideModels();
                     // Show popup + overlay + close-target plane, and make the
-                    // close plane click-able (class toggled so raycaster picks it up)
+                    // close plane clickable (class toggled so raycaster picks it up)
                     this.videoPopup.setAttribute('visible', true);
                     this.videoScreen.setAttribute('visible', true);
                     this.videoScreen.classList.add('clickable');
                     this.panelOverlay.setAttribute('visible', true);
-                    console.log('[openVideo] visibility set — videoPopup:', this.videoPopup.getAttribute('visible'), '| object3D.visible:', this.videoPopup.object3D.visible);
-                    // Walk up the parents to check for hidden ancestor
-                    let p = this.videoPopup.parentEl;
-                    while (p) {
-                        console.log('[openVideo] ancestor', p.tagName, p.id || '', 'visible attr:', p.getAttribute('visible'), '| object3D.visible:', p.object3D?.visible);
-                        p = p.parentEl;
-                    }
                     // Play
                     if (this.activeVideoEl) {
                         this.activeVideoEl.play().catch(e =>
@@ -432,7 +414,6 @@
                 //  AZORES MAP POPUP LOGIC
                 // ════════════════════════════════════════════════════
                 this.openMap = () => {
-                    console.log('[openMap] 🗺 called');
                     // Close video if open
                     if (this.activeVideoEl) {
                         this.activeVideoEl.pause();
@@ -449,12 +430,6 @@
                     mapImg.setAttribute('visible', true);
                     mapImg.classList.add('clickable');
                     this.panelOverlay.setAttribute('visible', true);
-                    console.log('[openMap] visibility set — azoresPopup:', this.azoresPopup.getAttribute('visible'), '| object3D.visible:', this.azoresPopup.object3D.visible);
-                    let p = this.azoresPopup.parentEl;
-                    while (p) {
-                        console.log('[openMap] ancestor', p.tagName, p.id || '', 'visible attr:', p.getAttribute('visible'), '| object3D.visible:', p.object3D?.visible);
-                        p = p.parentEl;
-                    }
                     console.log('🗺 Azores map opened.');
                 };
 
@@ -760,6 +735,7 @@
             <img id="azoresMapImg"  src="media/azores-map.png"     crossorigin="anonymous">
             <img id="linkedInLogo"  src="media/linkedIn-logo.png"  crossorigin="anonymous">
             <img id="emailIcon"     src="media/email-icon.png"      crossorigin="anonymous">
+            <img id="contactIcon"   src="media/contact-icon.svg"    crossorigin="anonymous">
             <img id="playIcon"      src="media/play-button-icon.png" crossorigin="anonymous">
             <img id="mapIcon"       src="media/map-icon.png"         crossorigin="anonymous">
 
@@ -918,19 +894,20 @@
                     wrap-count="18"
                 ></a-text>
 
-                <!-- Email Button — circular icon with scale pulse -->
+                <!-- Save Contact Button — circular icon with scale pulse.
+                     Clicking triggers a download of contact.vcf (vCard). -->
                 <a-entity position="0 0.02 0.005">
                     <a-circle
                         class="clickable"
-                        clickable="url: mailto:m3gandra@gmail.com"
+                        download-vcard="file: contact.vcf; filename: Miguel-Gandra.vcf"
                         radius="0.055"
                         animation="property: scale;
                                    from: 1.05 1.05 1; to: 1.2 1.2 1; dur: 1000;
                                    dir: alternate; easing: easeInOutSine; loop: true"
                     ></a-circle>
                     <a-image
-                        src="#emailIcon"
-                        width="0.068" height="0.068"
+                        src="#contactIcon"
+                        width="0.060" height="0.060"
                         position="0 0 0.01"
                     ></a-image>
                 </a-entity>
@@ -980,7 +957,8 @@
                         class="clickable"
                         ar-clickable="action: video1"
                         src="#playIcon"
-                        width="0.10" height="0.10"
+                        opacity="0.5"
+                        width="0.075" height="0.075"
                         position="0 0.018 0.001"
                         animation="property: scale;
                                    from: 1 1 1; to: 1.15 1.15 1;
@@ -998,7 +976,8 @@
                         class="clickable"
                         ar-clickable="action: video2"
                         src="#playIcon"
-                        width="0.10" height="0.10"
+                        opacity="0.5"
+                        width="0.075" height="0.075"
                         position="0 0.018 0.001"
                         animation="property: scale;
                                    from: 1 1 1; to: 1.15 1.15 1;
@@ -1016,7 +995,8 @@
                         class="clickable"
                         ar-clickable="action: video3"
                         src="#playIcon"
-                        width="0.10" height="0.10"
+                        opacity="0.5"
+                        width="0.075" height="0.075"
                         position="0 0.018 0.001"
                         animation="property: scale;
                                    from: 1 1 1; to: 1.15 1.15 1;
@@ -1034,7 +1014,8 @@
                         class="clickable"
                         ar-clickable="action: video4"
                         src="#playIcon"
-                        width="0.10" height="0.10"
+                        opacity="0.5"
+                        width="0.075" height="0.075"
                         position="0 0.018 0.001"
                         animation="property: scale;
                                    from: 1 1 1; to: 1.15 1.15 1;
@@ -1131,7 +1112,8 @@
                     class="clickable"
                     ar-clickable="action: map"
                     src="#mapIcon"
-                    width="0.10" height="0.10"
+                    opacity="0.5"
+                    width="0.075" height="0.075"
                     animation="property: scale;
                                from: 1 1 1; to: 1.15 1.15 1; dur: 900;
                                dir: alternate; easing: easeInOutSine; loop: true">
