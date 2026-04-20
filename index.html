@@ -392,8 +392,9 @@
                     if (this.videoTitle) this.videoTitle.setAttribute('value', label);
                     // Hide 3D models while popup is open
                     this.hideModels();
-                    // Show popup + overlay
+                    // Show popup + overlay + close-target plane
                     this.videoPopup.setAttribute('visible', true);
+                    this.videoScreen.setAttribute('visible', true);
                     this.panelOverlay.setAttribute('visible', true);
                     console.log('[openVideo] visibility set — videoPopup:', this.videoPopup.getAttribute('visible'), '| object3D.visible:', this.videoPopup.object3D.visible);
                     // Walk up the parents to check for hidden ancestor
@@ -417,6 +418,7 @@
                         this.activeVideoEl = null;
                     }
                     this.videoPopup.setAttribute('visible', false);
+                    this.videoScreen.setAttribute('visible', false);
                     this.panelOverlay.setAttribute('visible', false);
                     // Restore 3D models now that popup is closed
                     this.showModels();
@@ -434,10 +436,12 @@
                         this.activeVideoEl.currentTime = 0;
                         this.activeVideoEl = null;
                         this.videoPopup.setAttribute('visible', false);
+                        this.videoScreen.setAttribute('visible', false);
                     }
                     // Hide 3D models while popup is open
                     this.hideModels();
                     this.azoresPopup.setAttribute('visible', true);
+                    this.el.querySelector('#map-image').setAttribute('visible', true);
                     this.panelOverlay.setAttribute('visible', true);
                     console.log('[openMap] visibility set — azoresPopup:', this.azoresPopup.getAttribute('visible'), '| object3D.visible:', this.azoresPopup.object3D.visible);
                     let p = this.azoresPopup.parentEl;
@@ -450,6 +454,7 @@
 
                 this.closeMap = () => {
                     this.azoresPopup.setAttribute('visible', false);
+                    this.el.querySelector('#map-image').setAttribute('visible', false);
                     this.panelOverlay.setAttribute('visible', false);
                     // Restore 3D models now that popup is closed
                     this.showModels();
@@ -466,7 +471,10 @@
                         this.activeVideoEl = null;
                     }
                     this.videoPopup.setAttribute('visible', false);
+                    this.videoScreen.setAttribute('visible', false);
                     this.azoresPopup.setAttribute('visible', false);
+                    const mapImg = this.el.querySelector('#map-image');
+                    if (mapImg) mapImg.setAttribute('visible', false);
                     this.panelOverlay.setAttribute('visible', false);
                     // Restore models (guard inside showModels checks targetVisible)
                     this.showModels();
@@ -1068,9 +1076,14 @@
                 ></a-text>
 
                 <!-- Video screen — clickable to close; z=0.01 clears coplanar geometry -->
+                <!-- visible=false initially so the raycaster doesn't hit this plane
+                     (and steal clicks from the buttons behind it) when the popup
+                     is closed. openVideo/closeVideo toggle this in sync with the
+                     parent popup. -->
                 <a-plane
                     id="video-screen"
                     class="clickable"
+                    visible="false"
                     material="shader: flat; src: #videoLungeFeeding"
                     width="0.82"
                     height="0.46"
@@ -1137,9 +1150,12 @@
                 ></a-text>
 
                 <!-- Map image plane — clickable to close; z=0.01 clears coplanar geometry -->
+                <!-- Same fix as #video-screen: visible=false initially so it can't
+                     steal clicks from the map trigger / video buttons. -->
                 <a-plane
                     id="map-image"
                     class="clickable"
+                    visible="false"
                     src="#azoresMapImg"
                     width="0.88"
                     height="0.66"
