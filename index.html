@@ -665,13 +665,18 @@
             max-width: 340px;
             line-height: 1.5;
         }
+        @keyframes tap-glow {
+            0%, 100% { box-shadow: 0 0 0px 0px rgba(9, 76, 71, 0); }
+            50%      { box-shadow: 0 0 14px 4px rgba(9, 76, 71, 0.6); }
+        }
         #starter-overlay .tap-hint {
-            font-size: 0.85em;
+            font-size: 0.98em;
             color: #6699bb;
             border: 1px solid #336699;
-            padding: 8px 22px;
+            padding: 9px 26px;
             border-radius: 20px;
             margin-top: 6px;
+            animation: tap-glow 2s ease-in-out infinite;
         }
 
         /* ── Attribution info button ─────────────────────────── */
@@ -853,7 +858,7 @@
             border-color: rgba(46, 160, 67, 0.55);
         }
         .drawer-btn--primary {
-            background: rgba(0, 95, 142, 0.55);
+            background: rgba(9, 76, 71, 0.55);
             border-color: rgba(120, 200, 230, 0.45);
             border-radius: 10px;
             padding: 10px 20px;
@@ -864,7 +869,7 @@
             gap: 8px;
             margin-top: 10px;
         }
-        .drawer-btn--primary:active { background: rgba(0, 95, 142, 0.75); }
+        .drawer-btn--primary:active { background: rgba(9, 76, 71, 0.75); }
     </style>
 </head>
 <body>
@@ -875,9 +880,9 @@
     <!--  unlocks video elements for later programmatic playback.     -->
     <!-- ============================================================ -->
     <div id="starter-overlay" onclick="unlockVideos(); requestWakeLock(); document.getElementById('info-btn').style.display='flex'; this.style.display='none';">
-        <img src="media/SI2026-logo.png" class="conf-logo" alt="Sharks International 2026">
+        <img src="media/SI2026-logo.webp" class="conf-logo" alt="Sharks International 2026">
         <p class="conf-name">Sharks International 2026</p>
-        <img src="media/whale-shark.png" class="whale-shark-img" alt="Whale Shark">
+        <img src="media/whale-shark.webp" class="whale-shark-img" alt="Whale Shark">
         <h1>Whale Shark AR</h1>
         <p class="subtitle">
             Point your camera at the<br>
@@ -902,7 +907,7 @@
     <div id="info-drawer" aria-hidden="true">
         <div class="drawer-handle" onclick="toggleInfoOverlay()"></div>
         <div class="drawer-header">
-            <h2>Information Hub</h2>
+            <h2>Dive Deeper</h2>
             <button class="drawer-close" onclick="toggleInfoOverlay()" aria-label="Close">×</button>
         </div>
 
@@ -1008,9 +1013,9 @@
             <a-asset-item id="iPilotModel"       src="3D%20models/iPilot.glb"></a-asset-item>
 
             <!-- Images -->
-            <img id="posterImage"   src="SI2026%20-%20poster.jpg"  crossorigin="anonymous">
+            <img id="posterImage"   src="SI2026%20-%20poster.webp"  crossorigin="anonymous">
             <img id="profileImage"  src="media/profile.png"        crossorigin="anonymous">
-            <img id="azoresMapImg"  src="media/azores-map.png"     crossorigin="anonymous">
+            <img id="azoresMapImg"  src="media/azores-map.webp"     crossorigin="anonymous">
             <img id="linkedInLogo"  src="media/linkedIn-logo.png"  crossorigin="anonymous">
             <img id="emailIcon"     src="media/email-icon.png"      crossorigin="anonymous">
             <img id="contactIcon"   src="media/contact-icon.svg"    crossorigin="anonymous">
@@ -1182,7 +1187,7 @@
                     <a-plane
                         class="clickable"
                         download-vcard="file: contact.vcf; filename: Miguel-Gandra.vcf"
-                        material="shader: flat; color: #005f8e"
+                        material="shader: flat; color: #094C47"
                         width="0.22" height="0.062"
                     ></a-plane>
                     <a-text

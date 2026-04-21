@@ -16,3 +16,4 @@ example/
 # Node (in case you add a build step later)
 node_modules/
 .env
+media/legacy/
