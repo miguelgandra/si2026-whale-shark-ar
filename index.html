@@ -370,6 +370,10 @@
                 this.azoresTrigger = this.el.querySelector('#azores-trigger');
                 this.azoresPopup   = this.el.querySelector('#azores-popup');
 
+                // ── Paper panel (iPilot → Fontes 2022) ───────────────
+                this.paperPanel = this.el.querySelector('#paper-panel');
+                this.paperImage = this.el.querySelector('#paper-image');
+
                 // ── State ────────────────────────────────────────────
                 this.targetVisible = false;
 
@@ -440,6 +444,8 @@
                 //  label:   display name for the title bar
                 // ════════════════════════════════════════════════════
                 this.openVideo = (videoId, label) => {
+                    // Close the paper panel if open (mutual exclusivity).
+                    this.closePaper();
                     // Pause and reset any previously active video
                     if (this.activeVideoEl) {
                         this.activeVideoEl.pause();
@@ -486,6 +492,8 @@
                 //  AZORES MAP POPUP LOGIC
                 // ════════════════════════════════════════════════════
                 this.openMap = () => {
+                    // Close the paper panel if open (mutual exclusivity).
+                    this.closePaper();
                     // Close video if open
                     if (this.activeVideoEl) {
                         this.activeVideoEl.pause();
@@ -517,6 +525,63 @@
                 };
 
                 // ════════════════════════════════════════════════════
+                //  PAPER PANEL LOGIC (iPilot → Fontes 2022)
+                //  Toggled by clicking the 3D iPilot model. The panel
+                //  floats to the right of the poster; tapping the
+                //  screenshot opens the DOI in a new tab via the
+                //  existing `clickable` component.
+                // ════════════════════════════════════════════════════
+                this.openPaper = () => {
+                    // Mutual exclusivity — close video if open
+                    if (this.activeVideoEl) {
+                        this.activeVideoEl.pause();
+                        this.activeVideoEl.currentTime = 0;
+                        this.activeVideoEl = null;
+                        this.videoPopup.setAttribute('visible', false);
+                        this.videoScreen.setAttribute('visible', false);
+                        this.videoScreen.classList.remove('clickable');
+                    }
+                    // Close the map popup if open
+                    this.azoresPopup.setAttribute('visible', false);
+                    const mapImg = this.el.querySelector('#map-image');
+                    if (mapImg) {
+                        mapImg.setAttribute('visible', false);
+                        mapImg.classList.remove('clickable');
+                    }
+                    // Paper is side-attached (not a modal) — no poster dimming
+                    this.panelOverlay.setAttribute('visible', false);
+
+                    this.paperPanel.setAttribute('visible', true);
+                    this.paperImage.classList.add('clickable');
+
+                    // GA4 tracking
+                    const isDev = localStorage.getItem('is_developer') === 'true';
+                    if (typeof gtag === 'function' && !isDev) {
+                        gtag('event', 'paper_panel_opened', {
+                            event_category: 'AR Interaction',
+                            event_label: 'Fontes et al. 2022'
+                        });
+                    }
+                    console.log('📄 Paper panel opened.');
+                };
+
+                this.closePaper = () => {
+                    this.paperPanel.setAttribute('visible', false);
+                    this.paperImage.classList.remove('clickable');
+                    console.log('📄 Paper panel closed.');
+                };
+
+                this.togglePaper = () => {
+                    const v = this.paperPanel.getAttribute('visible');
+                    // A-Frame may return boolean or string depending on source
+                    if (v === true || v === 'true') {
+                        this.closePaper();
+                    } else {
+                        this.openPaper();
+                    }
+                };
+
+                // ════════════════════════════════════════════════════
                 //  CLOSE EVERYTHING (used on targetLost + close btns)
                 // ════════════════════════════════════════════════════
                 this.closeAll = () => {
@@ -534,6 +599,8 @@
                         mapImg.setAttribute('visible', false);
                         mapImg.classList.remove('clickable');
                     }
+                    // Close the paper panel too
+                    this.closePaper();
                     this.panelOverlay.setAttribute('visible', false);
                     // Restore models (guard inside showModels checks targetVisible)
                     this.showModels();
@@ -600,6 +667,9 @@
 
                 // Tap the map image to close
                 this.el.querySelector('#map-image').addEventListener('click', this.onCloseMap);
+
+                // Tap the iPilot 3D model to toggle the paper panel
+                this.iPilot.addEventListener('click', this.togglePaper);
             },
 
             remove: function () {
@@ -607,6 +677,7 @@
                 this.el.removeEventListener('targetLost',  this.onTargetLost);
                 this.el.querySelector('#video-screen')?.removeEventListener('click', this.onCloseVideo);
                 this.el.querySelector('#map-image')?.removeEventListener('click', this.onCloseMap);
+                this.el.querySelector('#ipilot-model')?.removeEventListener('click', this.togglePaper);
             }
         });
     </script>
@@ -1016,6 +1087,7 @@
             <img id="posterImage"   src="SI2026%20-%20poster.webp"  crossorigin="anonymous">
             <img id="profileImage"  src="media/profile.png"        crossorigin="anonymous">
             <img id="azoresMapImg"  src="media/azores-map.webp"     crossorigin="anonymous">
+            <img id="paperFontes2022" src="media/fontes2022.webp"   crossorigin="anonymous">
             <img id="linkedInLogo"  src="media/linkedIn-logo.png"  crossorigin="anonymous">
             <img id="emailIcon"     src="media/email-icon.png"      crossorigin="anonymous">
             <img id="contactIcon"   src="media/contact-icon.svg"    crossorigin="anonymous">
@@ -1138,6 +1210,7 @@
             <!-- ──────────────────────────────────────────────────── -->
             <a-entity
                 id="ipilot-model"
+                class="clickable"
                 gltf-model="#iPilotModel"
                 position="-0.051 0.010 0.4"
                 rotation="0 0 0"
@@ -1456,6 +1529,52 @@
                 ></a-text>
 
             </a-entity><!-- end #azores-popup -->
+
+            <!-- ──────────────────────────────────────────────────── -->
+            <!--  iPILOT PAPER PANEL                                  -->
+            <!--  Toggled by clicking the 3D iPilot model. Tapping    -->
+            <!--  the screenshot opens the DOI in a new tab. The      -->
+            <!--  `.clickable` class on #paper-image is toggled       -->
+            <!--  dynamically (openPaper/closePaper) — same pattern   -->
+            <!--  as #video-screen / #map-image.                      -->
+            <!--                                                      -->
+            <!--  Mirrors #side-content (x=-0.75, rot Y=+10°):         -->
+            <!--  this panel sits on the right with rot Y=-15° so it  -->
+            <!--  angles inward toward the viewer.                    -->
+            <!-- ──────────────────────────────────────────────────── -->
+            <a-entity id="paper-panel"
+                position="0.72 -0.05 0.02"
+                rotation="0 -15 0"
+                visible="false">
+
+                <!-- Title strip -->
+                <a-plane color="#001830" opacity="0.95"
+                         width="0.46" height="0.055"
+                         position="0 0.345 0"></a-plane>
+                <a-text value="Fontes et al. 2022  ·  Tap to open"
+                        align="center" color="#AAD4F5"
+                        scale="0.052 0.052 0.052"
+                        position="0 0.345 0.005"
+                        wrap-count="36"></a-text>
+
+                <!-- Screenshot — click target (flat shader = full brightness).
+                     Uses `clickable` component to open the DOI URL. -->
+                <a-plane id="paper-image"
+                         clickable="url: https://doi.org/10.1186/s40317-022-00310-1"
+                         material="shader: flat; src: #paperFontes2022"
+                         width="0.46" height="0.63"
+                         position="0 0 0.005"></a-plane>
+
+                <!-- Footer strip -->
+                <a-plane color="#001830" opacity="0.80"
+                         width="0.46" height="0.045"
+                         position="0 -0.338 0"></a-plane>
+                <a-text value="doi.org/10.1186/s40317-022-00310-1"
+                        align="center" color="#7799BB"
+                        scale="0.036 0.036 0.036"
+                        position="0 -0.338 0.005"
+                        wrap-count="48"></a-text>
+            </a-entity><!-- end #paper-panel -->
 
         </a-entity><!-- end mindar-image-target -->
     </a-scene>
