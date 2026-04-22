@@ -355,6 +355,9 @@
                 this.whaleShark   = this.el.querySelector('#whale-shark');
                 this.fishParticle = this.el.querySelector('#fish-particle');
                 this.iPilot       = this.el.querySelector('#ipilot-model');
+                // Invisible 2-triangle raycast proxy that replaces the GLB
+                // mesh as the click target (perf optimization).
+                this.iPilotHit    = this.el.querySelector('#ipilot-hit');
 
                 // ── Side content (profile + contacts) ────────────────
                 this.sideContent  = this.el.querySelector('#side-content');
@@ -387,6 +390,7 @@
                     this.orbitParent.setAttribute('visible', true);
                     this.fishParticle.setAttribute('visible', true);
                     this.iPilot.setAttribute('visible', true);
+                    this.iPilotHit.setAttribute('visible', true);
                     this.sideContent.setAttribute('visible', true);
                     this.videoButtons.setAttribute('visible', true);
                     this.azoresTrigger.setAttribute('visible', true);
@@ -405,6 +409,7 @@
                     this.orbitParent.setAttribute('visible', false);
                     this.fishParticle.setAttribute('visible', false);
                     this.iPilot.setAttribute('visible', false);
+                    this.iPilotHit.setAttribute('visible', false);
                     this.sideContent.setAttribute('visible', false);
                     this.videoButtons.setAttribute('visible', false);
                     this.azoresTrigger.setAttribute('visible', false);
@@ -428,6 +433,7 @@
                     this.orbitParent.setAttribute('visible', false);
                     this.fishParticle.setAttribute('visible', false);
                     this.iPilot.setAttribute('visible', false);
+                    this.iPilotHit.setAttribute('visible', false);
                     console.log('👁 Models hidden.');
                 };
 
@@ -437,6 +443,7 @@
                     this.orbitParent.setAttribute('visible', true);
                     this.fishParticle.setAttribute('visible', true);
                     this.iPilot.setAttribute('visible', true);
+                    this.iPilotHit.setAttribute('visible', true);
                     console.log('👁 Models shown.');
                 };
 
@@ -554,6 +561,9 @@
                     this.panelOverlay.setAttribute('visible', false);
 
                     this.paperPanel.setAttribute('visible', true);
+                    // Lazy-load screenshot texture only when the panel opens —
+                    // avoids eager GPU upload + decode at scene start.
+                    this.paperImage.setAttribute('material', 'src', '#paperFontes2022');
                     // Title, image, and button all raycast-eligible while visible.
                     this.paperTitle.classList.add('clickable');
                     this.paperImage.classList.add('clickable');
@@ -575,6 +585,9 @@
                     this.paperTitle.classList.remove('clickable');
                     this.paperImage.classList.remove('clickable');
                     this.paperDoiBtnPlane.classList.remove('clickable');
+                    // Release the screenshot texture so the GPU can reclaim it.
+                    this.paperImage.removeAttribute('material');
+                    this.paperImage.setAttribute('material', 'shader: flat');
                     console.log('📄 Paper panel closed.');
                 };
 
@@ -675,8 +688,10 @@
                 // Tap the map image to close
                 this.el.querySelector('#map-image').addEventListener('click', this.onCloseMap);
 
-                // Tap the iPilot 3D model to toggle the paper panel
-                this.iPilot.addEventListener('click', this.togglePaper);
+                // Tap the iPilot tag (via its invisible hit proxy) to toggle
+                // the paper panel. The proxy is 2 triangles vs. the GLB's
+                // hundreds — keeps the raycaster cheap.
+                this.iPilotHit.addEventListener('click', this.togglePaper);
 
                 // Any click inside the paper panel closes it (bubbles from
                 // title/image/button). The Read Publication button's own
@@ -690,7 +705,7 @@
                 this.el.removeEventListener('targetLost',  this.onTargetLost);
                 this.el.querySelector('#video-screen')?.removeEventListener('click', this.onCloseVideo);
                 this.el.querySelector('#map-image')?.removeEventListener('click', this.onCloseMap);
-                this.el.querySelector('#ipilot-model')?.removeEventListener('click', this.togglePaper);
+                this.el.querySelector('#ipilot-hit')?.removeEventListener('click', this.togglePaper);
                 this.el.querySelector('#paper-panel')?.removeEventListener('click', this.closePaper);
             }
         });
@@ -1064,7 +1079,11 @@
                       missTolerance: 5;
                       warmupTolerance: 3;"
         color-space="sRGB"
-        renderer="colorManagement: true; physicallyCorrectLights: true"
+        renderer="colorManagement: true;
+                  physicallyCorrectLights: false;
+                  precision: mediump;
+                  maxCanvasWidth: 1600; maxCanvasHeight: 1600;
+                  antialias: false"
         vr-mode-ui="enabled: false"
         device-orientation-permission-ui="enabled: false"
     >
@@ -1079,22 +1098,22 @@
                  it works on your target devices) -->
             <video id="videoLungeFeeding"
                 src="media/lunge-feeding.mp4"
-                preload="auto" loop muted playsinline webkit-playsinline
+                preload="metadata" loop muted playsinline webkit-playsinline
                 crossorigin="anonymous"></video>
 
             <video id="videoStationaryFeeding"
                 src="media/stationary-feeding.mp4"
-                preload="auto" loop muted playsinline webkit-playsinline
+                preload="metadata" loop muted playsinline webkit-playsinline
                 crossorigin="anonymous"></video>
 
             <video id="videoIntraspecific"
                 src="media/intraspecific-aggregation.mp4"
-                preload="auto" loop muted playsinline webkit-playsinline
+                preload="metadata" loop muted playsinline webkit-playsinline
                 crossorigin="anonymous"></video>
 
             <video id="videoSnipefish"
                 src="media/snipefish.mp4"
-                preload="auto" loop muted playsinline webkit-playsinline
+                preload="metadata" loop muted playsinline webkit-playsinline
                 crossorigin="anonymous"></video>
 
             <!-- 3D Models -->
@@ -1122,7 +1141,7 @@
             position="0 0 0"
             look-controls="enabled: false"
             cursor="fuse: false; rayOrigin: mouse;"
-            raycaster="far: 10000; objects: .clickable"
+            raycaster="far: 10000; interval: 100; objects: .clickable"
         ></a-camera>
 
         <!-- ════════════════════════════════════════════════════════ -->
@@ -1229,7 +1248,6 @@
             <!-- ──────────────────────────────────────────────────── -->
             <a-entity
                 id="ipilot-model"
-                class="clickable"
                 gltf-model="#iPilotModel"
                 position="-0.051 0.010 0.4"
                 rotation="0 0 0"
@@ -1239,6 +1257,19 @@
                            from: 0 0 0; to: 0 360 0;
                            dur: 10000; easing: linear; loop: true"
             ></a-entity>
+
+            <!-- Cheap raycast proxy for the iPilot tag — 2-triangle plane.
+                 Sits on top of the spinning GLB so the raycaster tests
+                 a trivial static surface instead of hundreds of mesh
+                 triangles every frame. Near-zero opacity + flat shader
+                 keeps it visually invisible. -->
+            <a-plane id="ipilot-hit"
+                class="clickable"
+                position="-0.051 0.010 0.4"
+                width="0.12" height="0.12"
+                material="shader: flat; color: #000; opacity: 0.001; transparent: true"
+                visible="false"
+            ></a-plane>
 
             <!-- ──────────────────────────────────────────────────── -->
             <!--  SIDE CONTENT COLUMN (Profile + Contact)             -->
@@ -1581,8 +1612,10 @@
                         wrap-count="32"></a-text>
 
                 <!-- Screenshot — tap-to-close target (flat shader = full brightness) -->
+                <!-- Texture assigned lazily in openPaper() to avoid eager
+                     decode/upload at scene start; cleared in closePaper(). -->
                 <a-plane id="paper-image"
-                         material="shader: flat; src: #paperFontes2022"
+                         material="shader: flat"
                          width="0.38" height="0.52"
                          position="0 0 0.005"></a-plane>
 
