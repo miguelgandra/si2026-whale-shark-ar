@@ -371,8 +371,10 @@
                 this.azoresPopup   = this.el.querySelector('#azores-popup');
 
                 // ── Paper panel (iPilot → Fontes 2022) ───────────────
-                this.paperPanel = this.el.querySelector('#paper-panel');
-                this.paperImage = this.el.querySelector('#paper-image');
+                this.paperPanel        = this.el.querySelector('#paper-panel');
+                this.paperTitle        = this.el.querySelector('#paper-title');
+                this.paperImage        = this.el.querySelector('#paper-image');
+                this.paperDoiBtnPlane  = this.el.querySelector('#paper-doi-btn-plane');
 
                 // ── State ────────────────────────────────────────────
                 this.targetVisible = false;
@@ -552,7 +554,10 @@
                     this.panelOverlay.setAttribute('visible', false);
 
                     this.paperPanel.setAttribute('visible', true);
+                    // Title, image, and button all raycast-eligible while visible.
+                    this.paperTitle.classList.add('clickable');
                     this.paperImage.classList.add('clickable');
+                    this.paperDoiBtnPlane.classList.add('clickable');
 
                     // GA4 tracking
                     const isDev = localStorage.getItem('is_developer') === 'true';
@@ -567,7 +572,9 @@
 
                 this.closePaper = () => {
                     this.paperPanel.setAttribute('visible', false);
+                    this.paperTitle.classList.remove('clickable');
                     this.paperImage.classList.remove('clickable');
+                    this.paperDoiBtnPlane.classList.remove('clickable');
                     console.log('📄 Paper panel closed.');
                 };
 
@@ -670,6 +677,12 @@
 
                 // Tap the iPilot 3D model to toggle the paper panel
                 this.iPilot.addEventListener('click', this.togglePaper);
+
+                // Any click inside the paper panel closes it (bubbles from
+                // title/image/button). The Read Publication button's own
+                // `clickable` component still fires first to open the DOI —
+                // this listener just cleans up the panel afterwards.
+                this.paperPanel.addEventListener('click', this.closePaper);
             },
 
             remove: function () {
@@ -678,6 +691,7 @@
                 this.el.querySelector('#video-screen')?.removeEventListener('click', this.onCloseVideo);
                 this.el.querySelector('#map-image')?.removeEventListener('click', this.onCloseMap);
                 this.el.querySelector('#ipilot-model')?.removeEventListener('click', this.togglePaper);
+                this.el.querySelector('#paper-panel')?.removeEventListener('click', this.closePaper);
             }
         });
     </script>
@@ -737,16 +751,21 @@
             line-height: 1.5;
         }
         @keyframes tap-glow {
-            0%, 100% { box-shadow: 0 0 0px 0px rgba(9, 76, 71, 0); }
-            50%      { box-shadow: 0 0 14px 4px rgba(9, 76, 71, 0.6); }
+            /* Brighter mint-green, larger halo — reads as luminous
+               against the deep-navy gradient background */
+            0%, 100% { box-shadow: 0 0 0px 0px rgba(64, 210, 170, 0); }
+            50%      { box-shadow: 0 0 28px 10px rgba(64, 210, 170, 0.75); }
         }
         #starter-overlay .tap-hint {
             font-size: 0.98em;
-            color: #6699bb;
-            border: 1px solid #336699;
+            color: #eaf5fb;                 /* near-white for max contrast */
+            border: 1px solid #5fa8d6;
             padding: 9px 26px;
             border-radius: 20px;
-            margin-top: 6px;
+            position: absolute;             /* pulled out of flex to anchor low */
+            bottom: 7%;
+            left: 50%;
+            transform: translateX(-50%);
             animation: tap-glow 2s ease-in-out infinite;
         }
 
@@ -1177,7 +1196,7 @@
                     id="whale-shark"
                     gltf-model="#whaleSharkModel"
                     orbit-swimmer="radius: 0.65; period: 20000; modelYaw: 0"
-                    scale="0.15 0.15 0.15"
+                    scale="0.1725 0.1725 0.1725"
                     animation-mixer="clip: *; loop: repeat; timeScale: 0"
                 ></a-entity>
             </a-entity>
@@ -1532,48 +1551,55 @@
 
             <!-- ──────────────────────────────────────────────────── -->
             <!--  iPILOT PAPER PANEL                                  -->
-            <!--  Toggled by clicking the 3D iPilot model. Tapping    -->
-            <!--  the screenshot opens the DOI in a new tab. The      -->
-            <!--  `.clickable` class on #paper-image is toggled       -->
-            <!--  dynamically (openPaper/closePaper) — same pattern   -->
-            <!--  as #video-screen / #map-image.                      -->
+            <!--  Toggled by clicking the 3D iPilot model. Sits       -->
+            <!--  immediately to the right of the iPilot tag so the   -->
+            <!--  tag → paper association is spatially clear.         -->
             <!--                                                      -->
-            <!--  Mirrors #side-content (x=-0.75, rot Y=+10°):         -->
-            <!--  this panel sits on the right with rot Y=-15° so it  -->
-            <!--  angles inward toward the viewer.                    -->
+            <!--  Tap-to-close: tapping the title strip OR screenshot -->
+            <!--  closes the panel (same pattern as video/map). The   -->
+            <!--  dedicated "Read Publication" button opens the DOI   -->
+            <!--  via the existing `clickable` component.             -->
+            <!--                                                      -->
+            <!--  .clickable classes on title/image/button are        -->
+            <!--  toggled dynamically (openPaper/closePaper) to       -->
+            <!--  avoid raycaster ghost-hits while hidden.            -->
             <!-- ──────────────────────────────────────────────────── -->
             <a-entity id="paper-panel"
-                position="0.72 -0.05 0.02"
-                rotation="0 -15 0"
+                position="0.30 0.01 0.40"
+                rotation="0 -10 0"
                 visible="false">
 
-                <!-- Title strip -->
-                <a-plane color="#001830" opacity="0.95"
-                         width="0.46" height="0.055"
-                         position="0 0.345 0"></a-plane>
-                <a-text value="Fontes et al. 2022  ·  Tap to open"
+                <!-- Title strip — tap-to-close target -->
+                <a-plane id="paper-title"
+                         color="#001830" opacity="0.95"
+                         width="0.38" height="0.048"
+                         position="0 0.290 0"></a-plane>
+                <a-text value="Fontes et al. 2022"
                         align="center" color="#AAD4F5"
-                        scale="0.052 0.052 0.052"
-                        position="0 0.345 0.005"
-                        wrap-count="36"></a-text>
+                        scale="0.046 0.046 0.046"
+                        position="0 0.290 0.005"
+                        wrap-count="32"></a-text>
 
-                <!-- Screenshot — click target (flat shader = full brightness).
-                     Uses `clickable` component to open the DOI URL. -->
+                <!-- Screenshot — tap-to-close target (flat shader = full brightness) -->
                 <a-plane id="paper-image"
-                         clickable="url: https://doi.org/10.1186/s40317-022-00310-1"
                          material="shader: flat; src: #paperFontes2022"
-                         width="0.46" height="0.63"
+                         width="0.38" height="0.52"
                          position="0 0 0.005"></a-plane>
 
-                <!-- Footer strip -->
-                <a-plane color="#001830" opacity="0.80"
-                         width="0.46" height="0.045"
-                         position="0 -0.338 0"></a-plane>
-                <a-text value="doi.org/10.1186/s40317-022-00310-1"
-                        align="center" color="#7799BB"
-                        scale="0.036 0.036 0.036"
-                        position="0 -0.338 0.005"
-                        wrap-count="48"></a-text>
+                <!-- Read Publication button — flat rounded rect + text.
+                     Opens DOI via existing `clickable` component.
+                     Click also bubbles up to #paper-panel and closes it. -->
+                <a-entity id="paper-doi-btn" position="0 -0.295 0.005">
+                    <a-plane id="paper-doi-btn-plane"
+                             clickable="url: https://doi.org/10.1186/s40317-022-00310-1"
+                             material="shader: flat; color: #094C47"
+                             width="0.22" height="0.050"></a-plane>
+                    <a-text value="Read Publication"
+                            align="center" color="#FFFFFF"
+                            scale="0.055 0.055 0.055"
+                            position="0 0 0.001"
+                            wrap-count="20"></a-text>
+                </a-entity>
             </a-entity><!-- end #paper-panel -->
 
         </a-entity><!-- end mindar-image-target -->
