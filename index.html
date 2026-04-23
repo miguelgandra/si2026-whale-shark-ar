@@ -557,8 +557,10 @@
                         mapImg.setAttribute('visible', false);
                         mapImg.classList.remove('clickable');
                     }
-                    // Paper is side-attached (not a modal) — no poster dimming
-                    this.panelOverlay.setAttribute('visible', false);
+                    // Match video/map focus mode: hide the 3D models and
+                    // dim the poster via the shared overlay.
+                    this.hideModels();
+                    this.panelOverlay.setAttribute('visible', true);
 
                     this.paperPanel.setAttribute('visible', true);
                     // Lazy-load screenshot texture only when the panel opens —
@@ -588,6 +590,9 @@
                     // Release the screenshot texture so the GPU can reclaim it.
                     this.paperImage.removeAttribute('material');
                     this.paperImage.setAttribute('material', 'shader: flat');
+                    // Exit focus mode (mirrors closeVideo / closeMap).
+                    this.panelOverlay.setAttribute('visible', false);
+                    this.showModels();
                     console.log('📄 Paper panel closed.');
                 };
 
@@ -1596,8 +1601,9 @@
             <!--  avoid raycaster ghost-hits while hidden.            -->
             <!-- ──────────────────────────────────────────────────── -->
             <a-entity id="paper-panel"
-                position="0.30 0.01 0.40"
-                rotation="0 -10 0"
+                position="0.30 0.01 0.55"
+                rotation="0 0 0"
+                scale="1.2 1.2 1.2"
                 visible="false">
 
                 <!-- Title strip — tap-to-close target -->
