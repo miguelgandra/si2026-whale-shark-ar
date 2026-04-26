@@ -791,22 +791,30 @@
 
         /* ── Attribution info button ─────────────────────────── */
         @keyframes info-pulse {
-            0%, 100% { opacity: 0.55; }
-            50%      { opacity: 1.0; }
+            0%, 100% {
+                opacity: 0.65;
+                box-shadow: 0 0 0 0 rgba(14, 106, 99, 0.45),
+                            0 0 8px  rgba(14, 106, 99, 0.30);
+            }
+            50% {
+                opacity: 1.0;
+                box-shadow: 0 0 0 6px rgba(14, 106, 99, 0.00),
+                            0 0 14px rgba(14, 106, 99, 0.65);
+            }
         }
         #info-btn {
             position: fixed;
             bottom: 18px;
             right: 18px;
-            width: 30px;
-            height: 30px;
+            width: 35px;
+            height: 35px;
             background: rgba(0, 0, 0, 0.40);
             color: #fff;
             border-radius: 50%;
             display: none;           /* revealed when splash is dismissed */
             align-items: center;
             justify-content: center;
-            font-size: 1.0em;
+            font-size: 1.15em;
             font-weight: 700;
             cursor: pointer;
             z-index: 500;
@@ -942,6 +950,17 @@
             color: #9ec9e0;
             margin-top: 2px;
         }
+        .researcher-name a.researcher-email {
+            display: block;
+            font-size: 0.82em;
+            color: #9ec9e0;
+            text-decoration: none;
+            margin-top: 1px;
+            letter-spacing: 0.01em;
+        }
+        .researcher-name a.researcher-email:active {
+            text-decoration: underline;
+        }
 
         .handles {
             font-size: 0.78em;
@@ -980,6 +999,20 @@
             margin-top: 10px;
         }
         .drawer-btn--primary:active { background: rgba(9, 76, 71, 0.75); }
+
+        /* Action row that hosts Save Contact + LinkedIn side-by-side. */
+        .drawer-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;          /* graceful wrap on very narrow screens */
+        }
+        .drawer-actions .drawer-btn--primary {
+            margin-top: 0;            /* gap drives spacing now */
+            flex: 1 1 auto;           /* split row width on mobile */
+            justify-content: center;  /* center icon+label inside button */
+            text-decoration: none;    /* the <a> variant inherits link styling */
+        }
     </style>
 </head>
 <body>
@@ -1031,12 +1064,19 @@
                         <img src="media/profile2.png" alt="Miguel Gandra">
                         <div class="researcher-name">
                             <strong>Miguel Gandra, PhD</strong>
-                            <span>Marine Biology Researcher · CCMAR &amp; IMAR</span>
+                            <span>Marine Conservation Scientist · CCMAR &amp; IMAR</span>
+                            <a class="researcher-email"
+                               href="mailto:m3gandra@gmail.com">m3gandra@gmail.com</a>
                         </div>
                     </div>
                     <p>I am a Marine Biologist at CCMAR and IMAR (Portugal), having recently completed my PhD (Summa Cum Laude) in January 2026. As a PI funded by multiple NGOs (including the Save Our Seas and FAM Foundations), I lead and collaborate on national and international projects to advance marine megafauna conservation.</p>
                     <p>My work sits at the intersection of high-resolution biologging, computational biology, and big data. I am also dedicated to innovating Digital SciComm through novel tools and open-source development, transforming complex telemetry data into impactful stories for ocean protection.</p>
-                    <button class="drawer-btn drawer-btn--primary" onclick="downloadVCard()">💾 Save Contact</button>
+                    <div class="drawer-actions">
+                        <button class="drawer-btn drawer-btn--primary" onclick="downloadVCard()">💾 Save Contact</button>
+                        <a class="drawer-btn drawer-btn--primary"
+                           href="https://www.linkedin.com/in/miguel-gandra/"
+                           target="_blank" rel="noopener noreferrer">🔗 LinkedIn</a>
+                    </div>
                 </div>
             </details>
 
