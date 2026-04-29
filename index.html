@@ -5,6 +5,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Whale Shark AR – SI2026</title>
 
+    <!-- ============================================================ -->
+    <!--  Camera deviceId shim — MUST run before MindAR loads.        -->
+    <!--  On multi-camera Android phones (Oppo Reno 14, some Samsung   -->
+    <!--  / Xiaomi), `facingMode: environment` may resolve to the     -->
+    <!--  ultrawide lens (fixed focus → MindAR can't lock the target).-->
+    <!--  If the user has explicitly picked a camera in the drawer's  -->
+    <!--  "Switch Camera" picker, force-apply that deviceId to every   -->
+    <!--  getUserMedia call that follows.                              -->
+    <!-- ============================================================ -->
+    <script>
+    (function () {
+        var saved = null;
+        try { saved = localStorage.getItem('cameraDeviceId'); } catch (e) {}
+        if (!saved || !navigator.mediaDevices) return;
+        var orig = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+        navigator.mediaDevices.getUserMedia = function (constraints) {
+            try {
+                if (constraints && constraints.video) {
+                    var v = constraints.video === true ? {} : Object.assign({}, constraints.video);
+                    v.deviceId = { exact: saved };
+                    // Drop facingMode — it can conflict with deviceId in some browsers.
+                    delete v.facingMode;
+                    constraints = Object.assign({}, constraints, { video: v });
+                }
+            } catch (e) { /* fall through to original */ }
+            return orig(constraints).catch(function (err) {
+                // If the saved device disappeared, retry once with default constraints.
+                console.warn('Saved camera failed; retrying default:', err);
+                try { localStorage.removeItem('cameraDeviceId'); } catch (e) {}
+                return orig({ video: { facingMode: 'environment' }, audio: false });
+            });
+        };
+    })();
+    </script>
+
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/aframe-extras@7.4.0/dist/aframe-extras.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
@@ -151,6 +186,79 @@
                     document.body.removeChild(a);
                 });
         }
+
+        // ============================================================
+        //  CAMERA PICKER (multi-lens devices like Oppo Reno 14)
+        //  Lists rear cameras, persists chosen deviceId in localStorage,
+        //  and reloads so the early head-shim applies it before MindAR
+        //  starts. "Auto" entry clears the override.
+        // ============================================================
+        window.openCameraPicker = async function () {
+            const modal = document.getElementById('camera-picker');
+            const list  = document.getElementById('camera-list');
+            const err   = document.getElementById('camera-picker-error');
+            err.hidden = true;
+            list.innerHTML = '<li><em>Loading cameras…</em></li>';
+            modal.classList.add('open');
+            modal.setAttribute('aria-hidden', 'false');
+
+            let savedId = null;
+            try { savedId = localStorage.getItem('cameraDeviceId'); } catch (e) {}
+
+            // enumerateDevices returns empty `label` until camera permission
+            // has been granted. Trigger a brief permission prompt with a
+            // generic environment-facing video stream, then stop it.
+            try {
+                const probe = await navigator.mediaDevices.getUserMedia(
+                    { video: { facingMode: 'environment' }, audio: false });
+                probe.getTracks().forEach(t => t.stop());
+            } catch (e) {
+                err.textContent = 'Camera permission required to list lenses.';
+                err.hidden = false;
+                list.innerHTML = '';
+                return;
+            }
+
+            const devices = (await navigator.mediaDevices.enumerateDevices())
+                .filter(d => d.kind === 'videoinput');
+
+            list.innerHTML = '';
+            list.appendChild(renderCameraItem({
+                deviceId: '',
+                label: 'Auto (system default)',
+                active: !savedId
+            }));
+            devices.forEach((d, i) => {
+                list.appendChild(renderCameraItem({
+                    deviceId: d.deviceId,
+                    label: d.label || `Camera ${i + 1}`,
+                    active: savedId === d.deviceId
+                }));
+            });
+        };
+
+        function renderCameraItem({ deviceId, label, active }) {
+            const li = document.createElement('li');
+            if (active) li.classList.add('active');
+            li.innerHTML = `<span>${label}</span>${active ? '<span class="check">✓</span>' : ''}`;
+            li.addEventListener('click', () => selectCamera(deviceId));
+            return li;
+        }
+
+        function selectCamera(deviceId) {
+            try {
+                if (deviceId) localStorage.setItem('cameraDeviceId', deviceId);
+                else          localStorage.removeItem('cameraDeviceId');
+            } catch (e) {}
+            // Reload so the early shim picks up the new value before MindAR starts.
+            location.reload();
+        }
+
+        window.closeCameraPicker = function () {
+            const modal = document.getElementById('camera-picker');
+            modal.classList.remove('open');
+            modal.setAttribute('aria-hidden', 'true');
+        };
 
         // ============================================================
         //  Unlock HTML5 video elements for mobile browsers.
@@ -1013,6 +1121,89 @@
             justify-content: center;  /* center icon+label inside button */
             text-decoration: none;    /* the <a> variant inherits link styling */
         }
+
+        /* ── Camera fix-up section at bottom of drawer ─────────── */
+        .drawer-camera-fix {
+            margin-top: 18px;
+            padding-top: 14px;
+            border-top: 1px solid rgba(255, 255, 255, 0.07);
+        }
+        .drawer-fix-hint {
+            font-size: 0.78em;
+            color: #9ec9e0;
+            margin: 0 0 8px;
+            line-height: 1.55;
+        }
+        .drawer-btn--secondary {
+            background: rgba(255, 255, 255, 0.10);
+            border: 1px solid rgba(120, 200, 230, 0.35);
+            border-radius: 10px;
+            padding: 9px 18px;
+            font-size: 0.82em;
+            font-weight: 500;
+            width: 100%;
+            text-align: center;
+            color: #ffffff;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .drawer-btn--secondary:active { background: rgba(255, 255, 255, 0.18); }
+
+        /* ── Camera picker modal ───────────────────────────────── */
+        #camera-picker {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            z-index: 700;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        #camera-picker.open { display: flex; }
+        .camera-picker-card {
+            background: rgba(10, 22, 32, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.10);
+            border-radius: 14px;
+            color: #e5e5e5;
+            width: 100%; max-width: 360px;
+            padding: 16px 18px 18px;
+        }
+        .camera-picker-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 6px;
+        }
+        .camera-picker-header h3 {
+            margin: 0; font-size: 1.0em; font-weight: 500; color: #fff;
+        }
+        .camera-picker-hint {
+            font-size: 0.78em; color: #9ec9e0; margin: 0 0 12px; line-height: 1.55;
+        }
+        .camera-list {
+            list-style: none; padding: 0; margin: 0;
+            max-height: 50vh; overflow-y: auto;
+        }
+        .camera-list li {
+            padding: 11px 12px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            margin-bottom: 8px;
+            cursor: pointer;
+            font-size: 0.86em;
+            -webkit-tap-highlight-color: transparent;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .camera-list li:active { background: rgba(255, 255, 255, 0.14); }
+        .camera-list li.active {
+            border-color: rgba(120, 200, 230, 0.55);
+            background: rgba(9, 76, 71, 0.30);
+        }
+        .camera-list li .check { color: #7EC8E3; font-weight: 700; }
+        .camera-picker-error {
+            color: #ff9c9c; font-size: 0.78em; margin: 8px 0 0;
+        }
     </style>
 </head>
 <body>
@@ -1111,6 +1302,36 @@
                 </div>
             </details>
 
+            <!-- Section 5 — Camera fix-up (multi-lens devices) -->
+            <div class="drawer-camera-fix">
+                <p class="drawer-fix-hint">
+                    On multi-camera phones the wrong lens may load.
+                    If detection fails, switch lenses below.
+                </p>
+                <button class="drawer-btn drawer-btn--secondary"
+                        onclick="openCameraPicker()">📷 Switch Camera</button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!--  CAMERA PICKER MODAL                                         -->
+    <!--  Opened from the drawer "Switch Camera" button. Lists rear   -->
+    <!--  cameras; selecting one persists deviceId + reloads the page.-->
+    <!-- ============================================================ -->
+    <div id="camera-picker" aria-hidden="true">
+        <div class="camera-picker-card">
+            <div class="camera-picker-header">
+                <h3>Select Camera</h3>
+                <button class="drawer-close" onclick="closeCameraPicker()" aria-label="Close">×</button>
+            </div>
+            <p class="camera-picker-hint">
+                Pick a rear camera, then the app will reload.
+                Choose <strong>Auto</strong> to use the system default.
+            </p>
+            <ul id="camera-list" class="camera-list"></ul>
+            <p id="camera-picker-error" class="camera-picker-error" hidden></p>
         </div>
     </div>
 
