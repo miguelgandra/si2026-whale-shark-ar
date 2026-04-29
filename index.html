@@ -116,6 +116,49 @@
             drawer.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
         }
 
+        // ============================================================
+        //  DRAG-TO-CLOSE on the drawer handle
+        //  Pull the pill down past the close threshold to dismiss.
+        //  A simple tap still closes via the existing onclick handler
+        //  (taps don't cross the threshold, so this is a no-op for them).
+        // ============================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            const drawer = document.getElementById('info-drawer');
+            const handle = drawer.querySelector('.drawer-handle');
+            const CLOSE_THRESHOLD_PX = 50;
+            let startY = 0, currentDy = 0, dragging = false;
+
+            handle.addEventListener('touchstart', (e) => {
+                if (!drawer.classList.contains('open')) return;
+                startY = e.touches[0].clientY;
+                currentDy = 0;
+                dragging = true;
+                drawer.classList.add('dragging');
+            }, { passive: true });
+
+            handle.addEventListener('touchmove', (e) => {
+                if (!dragging) return;
+                const dy = e.touches[0].clientY - startY;
+                if (dy < 0) { currentDy = 0; drawer.style.transform = ''; return; }
+                currentDy = dy;
+                drawer.style.transform = `translateY(${dy}px)`;
+                e.preventDefault();         // block body scroll while dragging
+            }, { passive: false });
+
+            function endDrag() {
+                if (!dragging) return;
+                dragging = false;
+                drawer.classList.remove('dragging');
+                drawer.style.transform = '';   // hand back to CSS-driven transform
+                if (currentDy > CLOSE_THRESHOLD_PX) {
+                    drawer.classList.remove('open');
+                    drawer.setAttribute('aria-hidden', 'true');
+                }
+            }
+            handle.addEventListener('touchend',    endDrag, { passive: true });
+            handle.addEventListener('touchcancel', endDrag, { passive: true });
+        });
+
         // Copies the conference tag bundle to clipboard and briefly updates the
         // button label as visual confirmation. Falls back to a textarea-based
         // copy for environments without navigator.clipboard (older iOS Safari).
@@ -188,76 +231,35 @@
         }
 
         // ============================================================
-        //  CAMERA PICKER (multi-lens devices like Oppo Reno 14)
-        //  Lists rear cameras, persists chosen deviceId in localStorage,
-        //  and reloads so the early head-shim applies it before MindAR
-        //  starts. "Auto" entry clears the override.
+        //  CAMERA CYCLE (multi-lens devices like Oppo Reno 14)
+        //  One-tap: enumerate rear videoinputs, advance to the next
+        //  one, persist + reload. The early head-shim then applies
+        //  the chosen deviceId to every getUserMedia call before
+        //  MindAR starts.
         // ============================================================
-        window.openCameraPicker = async function () {
-            const modal = document.getElementById('camera-picker');
-            const list  = document.getElementById('camera-list');
-            const err   = document.getElementById('camera-picker-error');
-            err.hidden = true;
-            list.innerHTML = '<li><em>Loading cameras…</em></li>';
-            modal.classList.add('open');
-            modal.setAttribute('aria-hidden', 'false');
-
-            let savedId = null;
-            try { savedId = localStorage.getItem('cameraDeviceId'); } catch (e) {}
-
-            // enumerateDevices returns empty `label` until camera permission
-            // has been granted. Trigger a brief permission prompt with a
-            // generic environment-facing video stream, then stop it.
+        window.cycleCamera = async function () {
             try {
+                // Trigger permission once so enumerateDevices returns labels.
                 const probe = await navigator.mediaDevices.getUserMedia(
                     { video: { facingMode: 'environment' }, audio: false });
                 probe.getTracks().forEach(t => t.stop());
+
+                const cams = (await navigator.mediaDevices.enumerateDevices())
+                    .filter(d => d.kind === 'videoinput');
+                if (cams.length < 2) {
+                    alert('Only one camera detected on this device.');
+                    return;
+                }
+
+                const saved   = localStorage.getItem('cameraDeviceId');
+                const curIdx  = Math.max(0, cams.findIndex(c => c.deviceId === saved));
+                const nextIdx = (curIdx + 1) % cams.length;
+                localStorage.setItem('cameraDeviceId', cams[nextIdx].deviceId);
+                location.reload();
             } catch (e) {
-                err.textContent = 'Camera permission required to list lenses.';
-                err.hidden = false;
-                list.innerHTML = '';
-                return;
+                console.error('cycleCamera failed:', e);
+                alert('Could not switch camera: ' + (e.message || e));
             }
-
-            const devices = (await navigator.mediaDevices.enumerateDevices())
-                .filter(d => d.kind === 'videoinput');
-
-            list.innerHTML = '';
-            list.appendChild(renderCameraItem({
-                deviceId: '',
-                label: 'Auto (system default)',
-                active: !savedId
-            }));
-            devices.forEach((d, i) => {
-                list.appendChild(renderCameraItem({
-                    deviceId: d.deviceId,
-                    label: d.label || `Camera ${i + 1}`,
-                    active: savedId === d.deviceId
-                }));
-            });
-        };
-
-        function renderCameraItem({ deviceId, label, active }) {
-            const li = document.createElement('li');
-            if (active) li.classList.add('active');
-            li.innerHTML = `<span>${label}</span>${active ? '<span class="check">✓</span>' : ''}`;
-            li.addEventListener('click', () => selectCamera(deviceId));
-            return li;
-        }
-
-        function selectCamera(deviceId) {
-            try {
-                if (deviceId) localStorage.setItem('cameraDeviceId', deviceId);
-                else          localStorage.removeItem('cameraDeviceId');
-            } catch (e) {}
-            // Reload so the early shim picks up the new value before MindAR starts.
-            location.reload();
-        }
-
-        window.closeCameraPicker = function () {
-            const modal = document.getElementById('camera-picker');
-            modal.classList.remove('open');
-            modal.setAttribute('aria-hidden', 'true');
         };
 
         // ============================================================
@@ -955,13 +957,23 @@
         #info-drawer.open { transform: translateY(0); }
 
         .drawer-handle {
+            width: 100%;            /* full strip is the grab target */
+            padding: 10px 0 6px;
+            display: flex;
+            justify-content: center;
+            cursor: grab;
+            touch-action: none;     /* we handle the gesture in JS */
+            flex-shrink: 0;
+        }
+        .drawer-handle::before {
+            content: "";
             width: 44px; height: 4px;
             background: rgba(255, 255, 255, 0.35);
             border-radius: 2px;
-            margin: 10px auto 6px;
-            cursor: pointer;
-            flex-shrink: 0;
         }
+        .drawer-handle:active { cursor: grabbing; }
+        /* Suppress slide transition while finger drives the position. */
+        #info-drawer.dragging { transition: none; }
         .drawer-header {
             display: flex;
             align-items: center;
@@ -1122,16 +1134,11 @@
             text-decoration: none;    /* the <a> variant inherits link styling */
         }
 
-        /* ── Camera fix-up section at bottom of drawer ─────────── */
-        .drawer-camera-fix {
-            margin-top: 18px;
-            padding-top: 14px;
-            border-top: 1px solid rgba(255, 255, 255, 0.07);
-        }
+        /* ── Cycle Camera button (inside Technology accordion) ──── */
         .drawer-fix-hint {
             font-size: 0.78em;
             color: #9ec9e0;
-            margin: 0 0 8px;
+            margin: 8px 0 8px;
             line-height: 1.55;
         }
         .drawer-btn--secondary {
@@ -1148,62 +1155,10 @@
         }
         .drawer-btn--secondary:active { background: rgba(255, 255, 255, 0.18); }
 
-        /* ── Camera picker modal ───────────────────────────────── */
-        #camera-picker {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.55);
-            backdrop-filter: blur(6px);
-            -webkit-backdrop-filter: blur(6px);
-            z-index: 700;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-        #camera-picker.open { display: flex; }
-        .camera-picker-card {
-            background: rgba(10, 22, 32, 0.95);
-            border: 1px solid rgba(255, 255, 255, 0.10);
-            border-radius: 14px;
-            color: #e5e5e5;
-            width: 100%; max-width: 360px;
-            padding: 16px 18px 18px;
-        }
-        .camera-picker-header {
-            display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 6px;
-        }
-        .camera-picker-header h3 {
-            margin: 0; font-size: 1.0em; font-weight: 500; color: #fff;
-        }
-        .camera-picker-hint {
-            font-size: 0.78em; color: #9ec9e0; margin: 0 0 12px; line-height: 1.55;
-        }
-        .camera-list {
-            list-style: none; padding: 0; margin: 0;
-            max-height: 50vh; overflow-y: auto;
-        }
-        .camera-list li {
-            padding: 11px 12px;
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            margin-bottom: 8px;
-            cursor: pointer;
-            font-size: 0.86em;
-            -webkit-tap-highlight-color: transparent;
-            display: flex; align-items: center; justify-content: space-between;
-        }
-        .camera-list li:active { background: rgba(255, 255, 255, 0.14); }
-        .camera-list li.active {
-            border-color: rgba(120, 200, 230, 0.55);
-            background: rgba(9, 76, 71, 0.30);
-        }
-        .camera-list li .check { color: #7EC8E3; font-weight: 700; }
-        .camera-picker-error {
-            color: #ff9c9c; font-size: 0.78em; margin: 8px 0 0;
-        }
+        /* Belt-and-braces: even with vr-mode-ui disabled, some Android
+           Chrome builds still inject the WebXR "Enter VR / AR" floating
+           button which can land on top of the ⓘ trigger. Force-hide. */
+        .a-enter-vr, .a-enter-ar { display: none !important; }
     </style>
 </head>
 <body>
@@ -1299,39 +1254,12 @@
                 <summary>⚙ Technology</summary>
                 <div class="acc-body">
                     <p>Built with <strong>MindAR.js</strong> for spatial tracking and <strong>A-Frame</strong> for 3D rendering. This experience is designed for mobile WebAR browser environments.</p>
+                    <p class="drawer-fix-hint">Switch lens if tracking fails.</p>
+                    <button class="drawer-btn drawer-btn--secondary"
+                            onclick="cycleCamera()">🔄 Cycle Camera</button>
                 </div>
             </details>
 
-            <!-- Section 5 — Camera fix-up (multi-lens devices) -->
-            <div class="drawer-camera-fix">
-                <p class="drawer-fix-hint">
-                    On multi-camera phones the wrong lens may load.
-                    If detection fails, switch lenses below.
-                </p>
-                <button class="drawer-btn drawer-btn--secondary"
-                        onclick="openCameraPicker()">📷 Switch Camera</button>
-            </div>
-
-        </div>
-    </div>
-
-    <!-- ============================================================ -->
-    <!--  CAMERA PICKER MODAL                                         -->
-    <!--  Opened from the drawer "Switch Camera" button. Lists rear   -->
-    <!--  cameras; selecting one persists deviceId + reloads the page.-->
-    <!-- ============================================================ -->
-    <div id="camera-picker" aria-hidden="true">
-        <div class="camera-picker-card">
-            <div class="camera-picker-header">
-                <h3>Select Camera</h3>
-                <button class="drawer-close" onclick="closeCameraPicker()" aria-label="Close">×</button>
-            </div>
-            <p class="camera-picker-hint">
-                Pick a rear camera, then the app will reload.
-                Choose <strong>Auto</strong> to use the system default.
-            </p>
-            <ul id="camera-list" class="camera-list"></ul>
-            <p id="camera-picker-error" class="camera-picker-error" hidden></p>
         </div>
     </div>
 
