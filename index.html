@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Whale Shark AR – SI2026</title>
 
+    <!-- Start fetching the image-target tree in parallel with the
+         A-Frame / MindAR scripts. MindAR's later fetch() resolves
+         from the preload cache instead of waiting a round-trip. -->
+    <link rel="preload" href="targets.mind" as="fetch">
+
     <!-- ============================================================ -->
     <!--  Camera deviceId shim — MUST run before MindAR loads.        -->
     <!--  On multi-camera Android phones (Oppo Reno 14, some Samsung   -->
