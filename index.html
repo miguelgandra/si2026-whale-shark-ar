@@ -241,6 +241,27 @@
         }
 
         // ============================================================
+        //  PIXEL-RATIO CAP
+        //  Caps WebGL DPR at 1.5 — on tall, high-DPR Android phones
+        //  this keeps fragment-shader cost in check without using
+        //  A-Frame's maxCanvasWidth/Height (which scissors a square
+        //  region and leaves a black band on the unrendered area).
+        //  Mathematically equivalent saving on a 1080-wide phone
+        //  (DPR 1.5 → 1620-wide buffer ≈ the old 1600 clamp).
+        // ============================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            const sceneEl = document.querySelector('a-scene');
+            if (!sceneEl) return;
+            const apply = () => {
+                if (sceneEl.renderer) {
+                    sceneEl.renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio));
+                }
+            };
+            if (sceneEl.hasLoaded) apply();
+            else sceneEl.addEventListener('loaded', apply, { once: true });
+        });
+
+        // ============================================================
         //  CAMERA CYCLE (multi-lens devices like Oppo Reno 14)
         //  One-tap: enumerate rear videoinputs, advance to the next
         //  one, persist + reload. The early head-shim then applies
@@ -1286,7 +1307,6 @@
         renderer="colorManagement: true;
                   physicallyCorrectLights: false;
                   precision: mediump;
-                  maxCanvasWidth: 1600; maxCanvasHeight: 1600;
                   antialias: false"
         vr-mode-ui="enabled: false"
         device-orientation-permission-ui="enabled: false"
