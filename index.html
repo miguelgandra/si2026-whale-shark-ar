@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Whale Shark AR – SI2026</title>
 
+    <!-- Drop two parallel DNS + TLS handshakes from the critical path
+         before any script fetch starts. Meaningful on cold cellular. -->
+    <link rel="preconnect" href="https://aframe.io" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
     <!-- Start fetching the image-target tree in parallel with the
          A-Frame / MindAR scripts. MindAR's later fetch() resolves
          from the preload cache instead of waiting a round-trip. -->
@@ -1326,8 +1331,6 @@
             <img id="azoresMapImg"  src="media/azores-map.webp"     crossorigin="anonymous">
             <img id="paperFontes2022" src="media/fontes2022.webp"   crossorigin="anonymous">
             <img id="linkedInLogo"  src="media/linkedIn-logo.png"  crossorigin="anonymous">
-            <img id="emailIcon"     src="media/email-icon.png"      crossorigin="anonymous">
-            <img id="contactIcon"   src="media/contact-icon.svg"    crossorigin="anonymous">
             <img id="playIcon"      src="media/play-button-icon.png" crossorigin="anonymous">
             <img id="mapIcon"       src="media/map-icon.png"         crossorigin="anonymous">
 
@@ -1500,8 +1503,8 @@
                 ></a-text>
 
                 <!-- Save Contact Button — flat rounded rect with text label.
-                     Uses shader: flat (no lit darkening) and no texture asset,
-                     avoiding the SVG MIME/CORS issues seen with #contactIcon. -->
+                     Uses shader: flat (no lit darkening) and no texture asset
+                     so it dodges the SVG MIME/CORS issues image-based buttons hit. -->
                 <a-entity position="0 0.02 0.005"
                     animation="property: scale;
                                from: 1.00 1.00 1; to: 1.08 1.08 1; dur: 1000;
